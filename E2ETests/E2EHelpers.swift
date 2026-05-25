@@ -79,6 +79,18 @@ extension XCUIApplication {
     }
 }
 
+// MARK: shape accessors
+//
+// The bridge writes nested JSON:  {editor:{...}, preview:{...}, pdfPresent, webViewCount}
+// These helpers keep test sites tidy.
+
+extension Dictionary where Key == String, Value == Any {
+    var editorState: [String: Any] { (self["editor"] as? [String: Any]) ?? [:] }
+    var previewState: [String: Any] { (self["preview"] as? [String: Any]) ?? [:] }
+    var pdfPresent: Bool { (self["pdfPresent"] as? Bool) ?? false }
+    var webViewCount: Int { (self["webViewCount"] as? Int) ?? 0 }
+}
+
 private func makeTempDir(line: UInt, file: StaticString) -> URL {
     let dir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("mdedit-e2e-\(UUID().uuidString)", isDirectory: true)

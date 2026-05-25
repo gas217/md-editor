@@ -124,53 +124,96 @@ final class E2EBridge {
         NSLog("[mdedit.e2e] injected e2e-state into window: %@", window.title)
     }
 
-    /// Walk the focused window's editor, eval a small probe, fold result into the
-    /// AX field for that window so tests scoped to a specific window see the right state.
+    /// Walk the focused window's editor + preview surfaces, eval probes, fold
+    /// result into the AX field for that window. Surfaces:
+    ///
+    ///   - editor WKWebView (CodeMirror): h1/h2/code counts, docLen, gutterBg
+    ///   - preview WKWebView (CSV/JSON/HTML render): tableRows, jsonKeys, htmlBodyChildren
+    ///   - PDFKit view (PDF): pdfHasDocument
+    ///
+    /// Tests scope to the key window so multi-doc setups stay independent.
     private func refreshState() {
         guard let window = NSApp.keyWindow ?? NSApp.mainWindow,
               let field = stateFields[ObjectIdentifier(window)] else { return }
-        guard let webView = findWebView(in: window.contentView) else {
-            field.setAccessibilityValue("{}")
-            field.stringValue = "{}"
-            return
+
+        let allWebViews = findAllWebViews(in: window.contentView)
+        let pdfPresent = hasPDFView(in: window.contentView)
+
+        // Identify editor vs preview by presence of `.cm-content` (CodeMirror's text wrapper).
+        // Build two probes and combine results.
+        let group = DispatchGroup()
+        var editorJSON = "{}"
+        var previewJSON = "{}"
+
+        for wv in allWebViews {
+            group.enter()
+            wv.evaluateJavaScript(Self.classifyProbe) { result, _ in
+                let str = (result as? String) ?? "{}"
+                if str.contains("\"isEditor\":true") {
+                    editorJSON = str
+                } else if !str.contains("\"isEditor\":true") {
+                    previewJSON = str
+                }
+                group.leave()
+            }
         }
-        // Read straight from the rendered DOM — no dependency on window.view
-        // (whose exposure has been fragile across CM6 mount paths). cm-content
-        // is CM6's text wrapper; its textContent is the live document buffer.
-        let probe = """
-        (function () {
-            try {
-                const h1 = document.querySelectorAll('.cm-h1').length;
-                const h2 = document.querySelectorAll('.cm-h2').length;
-                const code = document.querySelectorAll('.cm-inline-code').length;
-                const content = document.querySelector('.cm-content');
-                const docLen = content ? (content.textContent || '').length : 0;
-                const gutterBg = (function() {
-                    const g = document.querySelector('.cm-gutters');
-                    return g ? getComputedStyle(g).backgroundColor : '';
-                })();
-                return JSON.stringify({
-                    h1: h1, h2: h2, code: code,
-                    docLen: docLen,
-                    gutterBg: gutterBg,
-                });
-            } catch (e) { return '{"err":"' + e.message + '"}'; }
-        })()
-        """
-        webView.evaluateJavaScript(probe) { result, _ in
-            let str = (result as? String) ?? "{}"
-            field.setAccessibilityValue(str)
-            field.stringValue = str  // also set string so AX value reflects it
+
+        group.notify(queue: .main) {
+            // Stitch into a single object that tests can read with one AX call.
+            let combined = """
+            {"editor":\(editorJSON),"preview":\(previewJSON),"pdfPresent":\(pdfPresent ? "true" : "false"),"webViewCount":\(allWebViews.count)}
+            """
+            field.setAccessibilityValue(combined)
+            field.stringValue = combined
         }
     }
 
-    private func findWebView(in view: NSView?) -> WKWebView? {
-        guard let view else { return nil }
-        if let wv = view as? WKWebView { return wv }
-        for sub in view.subviews {
-            if let wv = findWebView(in: sub) { return wv }
-        }
-        return nil
+    /// Single JS probe used in every WKWebView. Returns `isEditor:true` for the
+    /// CodeMirror surface, otherwise treats the body as a rendered preview.
+    private static let classifyProbe = """
+    (function () {
+        try {
+            if (document.querySelector('.cm-content')) {
+                // Editor surface
+                return JSON.stringify({
+                    isEditor: true,
+                    h1: document.querySelectorAll('.cm-h1').length,
+                    h2: document.querySelectorAll('.cm-h2').length,
+                    code: document.querySelectorAll('.cm-inline-code').length,
+                    docLen: (document.querySelector('.cm-content').textContent || '').length,
+                    gutterBg: (function() {
+                        const g = document.querySelector('.cm-gutters');
+                        return g ? getComputedStyle(g).backgroundColor : '';
+                    })(),
+                    commentMarkers: document.querySelectorAll('.cm-comment-marker').length,
+                });
+            }
+            // Preview surface — count signals for csv/json/html
+            return JSON.stringify({
+                isEditor: false,
+                tableRows: document.querySelectorAll('table tr').length,
+                jsonKeys: document.querySelectorAll('.json-key, details').length,
+                htmlBodyChildren: document.body ? document.body.children.length : 0,
+                title: document.title || '',
+            });
+        } catch (e) { return JSON.stringify({err: e.message}); }
+    })()
+    """
+
+    private func findAllWebViews(in view: NSView?) -> [WKWebView] {
+        guard let view else { return [] }
+        var out: [WKWebView] = []
+        if let wv = view as? WKWebView { out.append(wv) }
+        for sub in view.subviews { out.append(contentsOf: findAllWebViews(in: sub)) }
+        return out
+    }
+
+    private func hasPDFView(in view: NSView?) -> Bool {
+        guard let view else { return false }
+        // Detect by class name string so we don't have to link PDFKit here.
+        if String(describing: type(of: view)).contains("PDFView") { return true }
+        for sub in view.subviews where hasPDFView(in: sub) { return true }
+        return false
     }
 }
 
