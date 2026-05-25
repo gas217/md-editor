@@ -43,6 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Add Help → Check for Updates… menu item (Sparkle does auto-check on its own).
         AppMenu.installCheckForUpdatesItem()
+        // Add Edit → Add Comment on Selection (⌘⇧M) so the shortcut is discoverable.
+        AppMenu.installAddCommentItem()
 
         // Welcome window if no document was opened from launch arguments.
         DispatchQueue.main.async {

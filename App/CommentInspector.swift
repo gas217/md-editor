@@ -11,36 +11,32 @@
 
 import SwiftUI
 
-struct CommentInspectorContainer: View {
+/// Owns the inspector's state across SwiftUI view recreations. Critical fix:
+/// the inspector's NSHostingController is collapsed by default on .md/.txt, so
+/// its SwiftUI view is NOT in the hierarchy when the user fires ⌘⇧M. If the
+/// `.onReceive` subscription lived inside the SwiftUI view, the notification
+/// would arrive BEFORE the view subscribed and the comment would silently
+/// vanish. By owning the observers here and storing state across reveals, the
+/// SwiftUI view just renders whatever's in the model on mount.
+final class CommentInspectorModel: ObservableObject {
+    @Published var composer: ComposerContext?
+    @Published var activeThread: CommentSidecar.Comment?
+
     let document: MDDocument
-    @State private var composer: ComposerContext?
-    @State private var activeThread: CommentSidecar.Comment?
+    private var observers: [NSObjectProtocol] = []
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-
-            Divider()
-
-            if let composer {
-                ComposerView(context: composer, document: document) {
-                    self.composer = nil
-                }
-            } else if let activeThread {
-                ThreadView(comment: activeThread, document: document) {
-                    self.activeThread = nil
-                }
-            } else {
-                EmptyStateView()
-            }
-        }
-        .frame(minWidth: 280, idealWidth: 340)
-        .background(Color(NSColor.windowBackgroundColor))
-        .onReceive(NotificationCenter.default.publisher(for: .mdeditCommentRequested)) { note in
-            guard let info = note.userInfo,
+    init(document: MDDocument) {
+        self.document = document
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .mdeditCommentRequested, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let info = note.userInfo,
                   let from = info["from"] as? Int,
                   let to = info["to"] as? Int,
-                  let url = info["documentURL"] as? URL else { return }
+                  let url = info["documentURL"] as? URL,
+                  // Notifications are app-wide; filter to this document's URL.
+                  url == self.document.fileURL else { return }
             self.activeThread = nil
             self.composer = ComposerContext(
                 from: from, to: to,
@@ -49,11 +45,12 @@ struct CommentInspectorContainer: View {
                 suffix: info["suffix"] as? String ?? "",
                 documentURL: url
             )
-        }
-        // Gutter dot click → load the matching thread from the sidecar.
-        // Closes the prior reviewer-noted gap: "reveal is designed but not wired end-to-end."
-        .onReceive(NotificationCenter.default.publisher(for: .mdeditCommentClicked)) { note in
-            guard let info = note.userInfo,
+        })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .mdeditCommentClicked, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let info = note.userInfo,
                   let id = info["id"] as? String,
                   let url = document.fileURL else { return }
             self.composer = nil
@@ -65,15 +62,51 @@ struct CommentInspectorContainer: View {
             } catch {
                 NSLog("[mdedit.inspector] load failed: \(error)")
             }
-        }
-        // Sidecar changed externally (CLI resolve, agent reply) → refresh active thread.
-        .onReceive(NotificationCenter.default.publisher(for: .mdeditCommentsChanged)) { _ in
-            guard let active = self.activeThread, let url = document.fileURL else { return }
+        })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .mdeditCommentsChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self,
+                  let active = self.activeThread,
+                  let url = document.fileURL else { return }
             if let sidecar = try? CommentStore.load(for: url),
                let updated = sidecar.comments.first(where: { $0.id == active.id }) {
                 self.activeThread = updated
             }
+        })
+    }
+
+    deinit { observers.forEach { NotificationCenter.default.removeObserver($0) } }
+
+    func dismissComposer() { composer = nil }
+    func dismissThread() { activeThread = nil }
+}
+
+struct CommentInspectorContainer: View {
+    @StateObject private var model: CommentInspectorModel
+
+    init(document: MDDocument) {
+        _model = StateObject(wrappedValue: CommentInspectorModel(document: document))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+            if let composer = model.composer {
+                ComposerView(context: composer, document: model.document) {
+                    model.dismissComposer()
+                }
+            } else if let activeThread = model.activeThread {
+                ThreadView(comment: activeThread, document: model.document) {
+                    model.dismissThread()
+                }
+            } else {
+                EmptyStateView()
+            }
         }
+        .frame(minWidth: 280, idealWidth: 340)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
     private var header: some View {

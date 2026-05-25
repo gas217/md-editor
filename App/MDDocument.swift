@@ -116,7 +116,7 @@ final class MDDocument: NSDocument {
     }
 }
 
-final class DocumentWindowController: NSWindowController {
+final class DocumentWindowController: NSWindowController, NSToolbarDelegate {
     init(document: MDDocument) {
         let window = NSWindow(
             contentRect: .init(x: 0, y: 0, width: 1100, height: 720),
@@ -126,17 +126,91 @@ final class DocumentWindowController: NSWindowController {
         )
         window.title = document.displayName ?? "Untitled"
         window.minSize = NSSize(width: 560, height: 360)
-        window.center()
-        // Persist the window frame per-document type but ignore size on a fresh
-        // doc — prevents the "tiny window in the corner" state-restoration bug
-        // by setting a sensible default that user adjustments override.
-        window.setFrameAutosaveName("MDEditorDocumentWindow")
         super.init(window: window)
         window.contentViewController = DocumentSplitViewController(document: document)
+        installToolbar()
+    }
+
+    override func showWindow(_ sender: Any?) {
+        // Apply our sizing rule before the window is shown, so state-restoration
+        // can't overwrite us (it runs after init but before showWindow).
+        if let window { applyInitialFrame(window) }
+        super.showWindow(sender)
+    }
+
+    /// Open full screen-height, 1/3-width on wide displays (≥2500 px), 1/2-width
+    /// on narrower ones. Centered horizontally. The user's later resizes are
+    /// what they live with — we don't keep overriding them.
+    private func applyInitialFrame(_ window: NSWindow) {
+        guard let screen = NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        let isWide = visible.width >= 2500
+        let width = (isWide ? visible.width / 3 : visible.width / 2).rounded()
+        let height = visible.height
+        let x = visible.minX + ((visible.width - width) / 2).rounded()
+        let y = visible.minY
+        window.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: NSToolbar — visible affordance for ⌘⇧M.
+    // Installed in windowDidLoad so the window is fully realised by the time the
+    // delegate callbacks fire (installing in init left the toolbar empty on macOS 15).
+
+    private static let addCommentItemId = NSToolbarItem.Identifier("MDEditor.addComment")
+    private static let toggleInspectorId = NSToolbarItem.Identifier("MDEditor.toggleInspector")
+
+    private func installToolbar() {
+        guard let window else { return }
+        let toolbar = NSToolbar(identifier: "MDEditor.DocumentToolbar.v3")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconOnly
+        toolbar.allowsUserCustomization = false
+        toolbar.autosavesConfiguration = false
+        window.toolbarStyle = .unified
+        window.toolbar = toolbar
+    }
+
+    func toolbar(_ toolbar: NSToolbar,
+                 itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        switch itemIdentifier {
+        case Self.addCommentItemId:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Comment"
+            item.paletteLabel = "Add Comment"
+            item.toolTip = "Add a comment on the selected text (⌘⇧M)"
+            item.image = NSImage(systemSymbolName: "bubble.left",
+                                 accessibilityDescription: "Add comment")
+            item.target = MenuActions.shared
+            item.action = #selector(MenuActions.addComment(_:))
+            item.isBordered = true
+            return item
+        case Self.toggleInspectorId:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Comments"
+            item.paletteLabel = "Toggle Comments Panel"
+            item.toolTip = "Show or hide the Comments panel"
+            item.image = NSImage(systemSymbolName: "sidebar.right",
+                                 accessibilityDescription: "Toggle comments panel")
+            item.target = MenuActions.shared
+            item.action = #selector(MenuActions.toggleInspector(_:))
+            item.isBordered = true
+            return item
+        default:
+            return nil
+        }
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace, Self.addCommentItemId, Self.toggleInspectorId]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [Self.addCommentItemId, Self.toggleInspectorId, .flexibleSpace, .space]
+    }
 }
 
 /// Top: NSSplitView (editor + lazy right pane). Bottom: status bar.
@@ -203,6 +277,15 @@ final class DocumentSplitViewController: NSViewController {
                 forName: .mdeditCommentClicked, object: nil, queue: .main
             ) { [weak self] _ in self?.revealInspector() }
         )
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: .mdeditToggleInspectorFired, object: nil, queue: .main
+            ) { [weak self] _ in
+                // Only the key window's split should toggle.
+                guard let self, self.view.window?.isKeyWindow == true else { return }
+                self.toggleInspector()
+            }
+        )
     }
 
     private func configureSplit() {
@@ -215,6 +298,12 @@ final class DocumentSplitViewController: NSViewController {
             splitVC.addSplitViewItem(mainItem)
 
             let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
+            // Force-load the SwiftUI hosting view NOW (before the user can fire ⌘⇧M)
+            // so the inspector model registers its NotificationCenter observers
+            // immediately. Without this, the SwiftUI view is created lazily on first
+            // reveal and the comment-requested notification arrives before any
+            // subscriber is listening — the bug Ag hit on the karpathy file.
+            _ = inspectorVC.view
             let item = NSSplitViewItem(viewController: inspectorVC)
             item.canCollapse = true
             item.isCollapsed = true            // hidden by default
@@ -243,6 +332,11 @@ final class DocumentSplitViewController: NSViewController {
             rightVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
             collapsedByDefault = true   // inspector is on-demand for .md/.txt
         }
+        // Same reason as the PDF branch: force-load the SwiftUI view NOW so the
+        // inspector's NotificationCenter observers register before the user can
+        // fire ⌘⇧M. Without this the comment-requested notification arrives
+        // before any subscriber is listening and the composer never appears.
+        _ = rightVC.view
         let rightItem = NSSplitViewItem(viewController: rightVC)
         rightItem.canCollapse = true
         rightItem.isCollapsed = collapsedByDefault
@@ -258,6 +352,15 @@ final class DocumentSplitViewController: NSViewController {
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.allowsImplicitAnimation = true
             item.animator().isCollapsed = false
+        }
+    }
+
+    /// Public toggle so the toolbar button can show/hide the panel.
+    func toggleInspector() {
+        guard let item = inspectorItem else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.allowsImplicitAnimation = true
+            item.animator().isCollapsed.toggle()
         }
     }
 }

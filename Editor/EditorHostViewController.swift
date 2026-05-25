@@ -7,6 +7,8 @@ import WebKit
 final class EditorHostViewController: NSViewController {
     private let document: MDDocument
     private var webView: WKWebView!
+    private var bridge: BridgeHandler?
+    private var menuObserver: NSObjectProtocol?
 
     init(document: MDDocument) {
         self.document = document
@@ -16,7 +18,9 @@ final class EditorHostViewController: NSViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    private var bridge: BridgeHandler?
+    deinit {
+        if let menuObserver { NotificationCenter.default.removeObserver(menuObserver) }
+    }
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -29,6 +33,17 @@ final class EditorHostViewController: NSViewController {
 
         if let url = Bundle.main.url(forResource: "editor", withExtension: "html") {
             webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        }
+
+        // Edit → Add Comment menu / toolbar item routes here for the focused doc.
+        // We forward to the CM6 side which already knows how to grab the selection
+        // and emit comment.requested back through the bridge.
+        menuObserver = NotificationCenter.default.addObserver(
+            forName: .mdeditAddCommentMenuFired, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self,
+                  self.view.window?.isKeyWindow == true else { return }
+            self.bridge?.send(type: "palette.invoke", payload: ["id": "comment.add"], reply: nil)
         }
     }
 }

@@ -189,8 +189,13 @@ const commentTheme = EditorView.baseTheme({
     },
     ".cm-h3": { fontSize: "1.25em", fontWeight: "700", padding: "0.3em 0 0.1em" },
     ".cm-h4, .cm-h5, .cm-h6": { fontSize: "1.05em", fontWeight: "700" },
-    ".cm-strong": { fontWeight: "700" },
-    ".cm-em": { fontStyle: "italic" },
+    // Blockquote: left border + indent + slightly muted color. Italics come
+    // from HighlightStyle's t.quote rule so they survive on the markers too.
+    ".cm-blockquote-line": {
+        borderLeft: "3px solid rgba(127,127,127,0.4)",
+        paddingLeft: "0.9em",
+        color: "rgba(200,200,210,0.78)",
+    },
     ".cm-inline-code": {
         fontFamily: "'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, monospace",
         fontSize: "0.92em",
@@ -219,27 +224,36 @@ const mdHighlight = HighlightStyle.define([
     { tag: t.list, color: "#c39bd3" },
     { tag: t.quote, color: "#9aa6b2", fontStyle: "italic" },
     { tag: t.contentSeparator, color: "rgba(127,127,127,0.5)" },
-    // Markdown syntax characters (the `#`, `**`, `` ` ``, `-`, `>`) get a dim color
-    // so the raw source on the active line stays legible without shouting.
-    { tag: t.processingInstruction, color: "rgba(127,127,127,0.55)" },
-    { tag: t.meta, color: "rgba(127,127,127,0.55)" },
+    // Markdown syntax markers (`#`, `**`, `` ` ``, `-`, `>`, `[`/`]`/`(`/`)`).
+    // ALWAYS visible — see hybridLivePreview comment for why — but dim enough
+    // that they fade into the background. The whole point is no text jumping
+    // when the cursor moves between lines.
+    { tag: t.processingInstruction, color: "rgba(127,127,127,0.4)", fontWeight: "400" },
+    { tag: t.meta, color: "rgba(127,127,127,0.4)" },
+    { tag: t.punctuation, color: "rgba(127,127,127,0.55)" },
 ]);
 
-// Hybrid live preview: walks the syntax tree, decorates headings/bold/italic/inline-code,
-// and hides the marker characters (`#`, `**`, `*`, `` ` ``) for paragraphs whose lines
-// are NOT under the cursor. The active line stays raw so the user can edit syntax.
-// Obsidian Live Preview model; MarkEdit doesn't ship this.
+// Markdown line/inline styling plugin. NO marker hiding — markers stay visible
+// always, just dimmed via HighlightStyle's processingInstruction/meta tags.
+// Reason: reveal-on-cursor-entry shifts the text and is bad UX (user feedback).
+// MarkEdit takes this approach too. If we ever want full render mode, that's a
+// separate "preview mode" toggle (Cmd-Opt-P), not a per-cursor reveal.
 //
-// Uses Decoration.set (auto-sorts) rather than RangeSetBuilder — the old builder
-// path threw silently when point + range decorations landed at the same offset,
-// which is why the editor was rendering raw markdown source.
+// What this plugin actually does:
+//   1. Line decoration `cm-hN` on heading lines → makes the WHOLE line larger,
+//      including the `#` markers. Heading proportions stay readable.
+//   2. Line decoration `cm-blockquote` on quote lines → italic + left border.
+//   3. Mark decoration `cm-inline-code` on inline-code content (between the
+//      backticks, NOT including them) → chip background, monospace.
+// Strong/Emphasis don't need a custom decoration — HighlightStyle on t.strong /
+// t.emphasis handles those, applied to the inner content (markers stay dim).
 const hybridLivePreview = ViewPlugin.fromClass(class {
     decorations: DecorationSet;
     constructor(view: EditorView) {
         this.decorations = this.build(view);
     }
     update(u: ViewUpdate) {
-        if (u.docChanged || u.selectionSet || u.viewportChanged) {
+        if (u.docChanged || u.viewportChanged) {
             this.decorations = this.build(u.view);
         }
     }
@@ -247,76 +261,60 @@ const hybridLivePreview = ViewPlugin.fromClass(class {
         try {
             const ranges: { from: number; to: number; deco: Decoration }[] = [];
             const doc = view.state.doc;
-            // Active lines: every line touched by any cursor or selection range.
-            const activeLines = new Set<number>();
-            for (const r of view.state.selection.ranges) {
-                const fromLine = doc.lineAt(r.from).number;
-                const toLine = doc.lineAt(r.to).number;
-                for (let l = fromLine; l <= toLine; l++) activeLines.add(l);
-            }
             const tree = syntaxTree(view.state);
+            const seenQuoteLines = new Set<number>();
+
             for (const { from, to } of view.visibleRanges) {
                 tree.iterate({
                     from,
                     to,
                     enter: (node) => {
-                        const lineNum = doc.lineAt(node.from).number;
-                        const onActiveLine = activeLines.has(lineNum);
-
-                        // ATX heading: hide the leading `# ` marks on non-active lines, style the line.
                         if (node.name.startsWith("ATXHeading")) {
                             const levelMatch = node.name.match(/(\d)$/);
                             const level = levelMatch ? Number(levelMatch[1]) : 1;
                             const lineFrom = doc.lineAt(node.from).from;
-                            const lineTo = doc.lineAt(node.to).to;
                             ranges.push({
                                 from: lineFrom, to: lineFrom,
                                 deco: Decoration.line({ class: `cm-h${level}` }),
                             });
-                            if (!onActiveLine) {
-                                const text = doc.sliceString(lineFrom, lineTo);
-                                const m = text.match(/^(#+\s+)/);
-                                if (m) {
-                                    ranges.push({
-                                        from: lineFrom, to: lineFrom + m[1].length,
-                                        deco: Decoration.mark({ class: "cm-hidden-marker" }),
-                                    });
-                                }
-                            }
+                            return;
                         }
-                        if (node.name === "StrongEmphasis") {
-                            ranges.push({ from: node.from, to: node.to, deco: Decoration.mark({ class: "cm-strong" }) });
-                            if (!onActiveLine) {
-                                ranges.push({ from: node.from, to: node.from + 2, deco: Decoration.mark({ class: "cm-hidden-marker" }) });
-                                ranges.push({ from: node.to - 2,   to: node.to,   deco: Decoration.mark({ class: "cm-hidden-marker" }) });
+                        if (node.name === "Blockquote") {
+                            // A blockquote spans one or more lines; add a line decoration
+                            // to each so the left border + italic apply to wrapped text too.
+                            const startLine = doc.lineAt(node.from).number;
+                            const endLine = doc.lineAt(node.to).number;
+                            for (let n = startLine; n <= endLine; n++) {
+                                if (seenQuoteLines.has(n)) continue;
+                                seenQuoteLines.add(n);
+                                const line = doc.line(n);
+                                ranges.push({
+                                    from: line.from, to: line.from,
+                                    deco: Decoration.line({ class: "cm-blockquote-line" }),
+                                });
                             }
-                        }
-                        if (node.name === "Emphasis") {
-                            ranges.push({ from: node.from, to: node.to, deco: Decoration.mark({ class: "cm-em" }) });
-                            if (!onActiveLine) {
-                                ranges.push({ from: node.from, to: node.from + 1, deco: Decoration.mark({ class: "cm-hidden-marker" }) });
-                                ranges.push({ from: node.to - 1,   to: node.to,   deco: Decoration.mark({ class: "cm-hidden-marker" }) });
-                            }
+                            return;
                         }
                         if (node.name === "InlineCode") {
-                            ranges.push({ from: node.from, to: node.to, deco: Decoration.mark({ class: "cm-inline-code" }) });
-                            if (!onActiveLine) {
-                                ranges.push({ from: node.from, to: node.from + 1, deco: Decoration.mark({ class: "cm-hidden-marker" }) });
-                                ranges.push({ from: node.to - 1,   to: node.to,   deco: Decoration.mark({ class: "cm-hidden-marker" }) });
+                            // Wrap ONLY the content between the backticks so the chip
+                            // background doesn't sit under the dimmed `` ` `` markers.
+                            const inner = { from: node.from + 1, to: node.to - 1 };
+                            if (inner.to > inner.from) {
+                                ranges.push({
+                                    from: inner.from, to: inner.to,
+                                    deco: Decoration.mark({ class: "cm-inline-code" }),
+                                });
                             }
+                            return;
                         }
                     },
                 });
             }
-            // Decoration.set sorts and de-overlaps automatically. Filter zero-or-negative-length
-            // mark decorations (line decorations are point, from == to, which IS valid).
-            const valid = ranges
+            const decos = ranges
                 .filter(r => r.to >= r.from)
                 .map(r => r.deco.range(r.from, r.to));
-            return Decoration.set(valid, /*sort=*/ true);
+            return Decoration.set(decos, /*sort=*/ true);
         } catch (e) {
-            // If this ever throws, surface it to Swift via the bridge log instead
-            // of silently producing an empty decoration set (the old bug mode).
             send("log", { level: "error", message: `hybridLivePreview build failed: ${e}` }, 0);
             return Decoration.none;
         }
