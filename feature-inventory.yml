@@ -1,0 +1,210 @@
+# Feature inventory — source of truth for the Feature compliance metric (dimension 9).
+# Every entry maps a VISION.md feature to required artifacts. A feature passes
+# scoring if every artifact in `requires:` exists and `milestone` is V1.0, V1.1, or V2.
+#
+# Add a feature here when adding it to VISION.md. Removing without scaffolding evidence drops the score.
+
+features:
+  # Viewing
+  - id: preview-by-default
+    section: Viewing
+    milestone: V1.0
+    requires:
+      - Tests/RenderPerformance.swift
+      - Tests/RenderFidelity.swift
+      - Preview/PreviewView.swift
+
+  - id: six-supported-formats
+    section: Viewing
+    milestone: V1.1
+    requires:
+      - Tests/CSVRender.swift
+      - Tests/JSONTree.swift
+      - Tests/HTMLSandbox.swift
+
+  - id: dark-mode
+    section: Viewing
+    milestone: V1.0
+    requires:
+      - Tests/RenderFidelity.swift
+
+  - id: file-size-ceilings
+    section: Viewing
+    milestone: V1.0
+    requires:
+      - Tests/RenderPerformance.swift
+
+  # Editing (light)
+  - id: hybrid-live-preview
+    section: Editing
+    milestone: V1.0
+    requires:
+      - Editor/EditorHostViewController.swift
+      - Editor/web/src/editor.ts
+      - Tests/TypingLatency.swift
+
+  - id: source-mode
+    section: Editing
+    milestone: V1.0
+    requires:
+      - Editor/web/src/editor.ts
+      - Tests/TypingLatency.swift
+
+  - id: notion-inline-editing
+    section: Editing
+    # NOTE: this entry intentionally requires *future* files that don't yet exist.
+    # When Story V1.1 ships slash-commands / drag-to-reorder / markdown-shortcut
+    # conversion, those go in `Editor/web/src/notion.ts` and
+    # `Tests/SlashCommands.swift`. Until then this feature scores as failing —
+    # which is honest, not punishing.
+    milestone: V1.1
+    requires:
+      - Editor/web/src/editor.ts
+      - Editor/web/src/notion.ts
+      - Tests/TypingLatency.swift
+      - Tests/SlashCommands.swift
+
+  - id: atomic-save
+    section: Editing
+    milestone: V1.0
+    requires:
+      - App/MDDocument.swift
+      - Tests/RoundTrip.swift
+
+  - id: dictation
+    section: Editing
+    milestone: V1.0
+    requires:
+      - App/MDDocument.swift
+
+  # Commenting
+  - id: comments-on-any-line
+    section: Commenting
+    milestone: V1.0
+    requires:
+      - Comments/CommentSidecar.swift
+      - Comments/AnchorResolver.swift
+      - Tests/CommentRoundTrip.swift
+
+  - id: sidecar-json
+    section: Commenting
+    milestone: V1.0
+    requires:
+      - Comments/CommentSidecar.swift
+      - Tests/CommentRoundTrip.swift
+
+  - id: anchor-cascade
+    section: Commenting
+    milestone: V1.0
+    requires:
+      - Comments/AnchorResolver.swift
+      - App/TextCanon.swift
+      - Tests/AnchorDrift.swift
+      - Tests/CanonFuzz.swift
+
+  - id: drift-tolerant
+    section: Commenting
+    milestone: V1.0
+    requires:
+      - Comments/AnchorResolver.swift
+      - Tests/AnchorDrift.swift
+
+  - id: mentions
+    section: Commenting
+    milestone: V1.0
+    requires:
+      - Comments/CommentSidecar.swift
+
+  - id: tags
+    section: Commenting
+    milestone: V1.0
+    requires:
+      - Comments/CommentSidecar.swift
+
+  # History
+  - id: nsfileversion-history
+    section: History
+    milestone: V1.0
+    requires:
+      - App/MDDocument.swift
+      - Tests/RoundTrip.swift
+
+  - id: comment-history
+    section: History
+    milestone: V1.1
+    requires:
+      - Comments/CommentSidecar.swift
+
+  # AI-agent loop
+  - id: addressable-flag
+    section: AI-agent loop
+    milestone: V1.0
+    requires:
+      - Comments/CommentSidecar.swift
+      - Tests/CLI.swift
+
+  - id: cli-for-agents
+    section: AI-agent loop
+    milestone: V1.0
+    requires:
+      - Tests/CLI.swift
+
+  # Finder integration
+  - id: registered-opener
+    section: Finder
+    milestone: V1.0
+    requires:
+      - project.yml
+
+  - id: drag-to-dock
+    section: Finder
+    milestone: V1.0
+    requires:
+      - App/MDEditorApp.swift
+
+  - id: mdedit-cli
+    section: Finder
+    milestone: V1.0
+    requires:
+      - Tests/CLI.swift
+
+  # Sidebar
+  - id: file-browser
+    section: Sidebar
+    milestone: V1.0
+    requires:
+      - Sidebar/SidebarView.swift
+
+  # Apple Intelligence
+  - id: writing-tools
+    section: AppleIntelligence
+    milestone: V1.0
+    requires:
+      - Editor/EditorHostViewController.swift
+
+  # Quality
+  - id: standard-shortcuts
+    section: Quality
+    milestone: V1.0
+    requires:
+      - Tests/Shortcuts.swift
+
+  - id: no-permission-prompts
+    section: Quality
+    milestone: V1.0
+    requires:
+      - project.yml
+
+  - id: lightweight-budgets
+    section: Quality
+    milestone: V1.0
+    requires:
+      - Tests/ColdLaunch.swift
+      - Tests/MemoryFootprint.swift
+      - Tests/BinarySize.sh
+
+  - id: local-first
+    section: Quality
+    milestone: V1.0
+    requires:
+      - LICENSE

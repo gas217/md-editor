@@ -1,0 +1,38 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+*.xcframework
+
+# Generated baselines (run `make baseline` to recreate)
+baselines.json
+
+# Score artifacts (kept locally; CI regenerates)
+score.json
+# score-history.jsonl IS committed — that's the trend log
+
+# Editor and OS junk
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Node (CM6 bundle build, V1.0 Story 0)
+node_modules/
+package-lock.json
+dist/
+
+# Test artifacts
+drift-report.json
+*.xctestplan.bak

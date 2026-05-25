@@ -1,0 +1,116 @@
+# XcodeGen project spec for MD Editor.
+# Run `make project` to regenerate MDEditor.xcodeproj.
+# See VISION.md for architecture and module boundaries.
+
+name: MDEditor
+options:
+  bundleIdPrefix: com.mdedit
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+    PRODUCT_BUNDLE_IDENTIFIER: com.mdedit.app
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    ENABLE_HARDENED_RUNTIME: YES
+
+packages:
+  preview-md-shared:
+    path: ../preview-md-shared
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+
+targets:
+  MDEditor:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: App
+      - path: App/Assets.xcassets
+      - path: Editor
+        # Exclude the JS toolchain — node_modules etc. are not Swift sources.
+        # The CM6 bundle is copied in as a Resources/ asset by `make build`.
+        excludes:
+          - "web/**"
+      - path: Comments
+      - path: Sidebar
+      - path: Preview
+      - path: Bridge
+      - path: App/MDEditor.entitlements
+        buildPhase: none
+    entitlements:
+      path: App/MDEditor.entitlements
+    dependencies:
+      - package: preview-md-shared
+        product: PreviewMDShared
+      - package: Sparkle
+        product: Sparkle
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleName: MD Editor
+        CFBundleShortVersionString: "0.1.0"
+        LSMinimumSystemVersion: "14.0"
+        NSHumanReadableCopyright: "MIT — github.com/gas217/md-editor"
+        # Sparkle 2 appcast URL — stable across releases (per RELEASING.md).
+        SUFeedURL: "https://github.com/gas217/md-editor/releases/download/appcast/appcast.xml"
+        # Sparkle EdDSA public key — paired private key lives in the Keychain
+        # ("ed25519" account, service "https://sparkle-project.org") via
+        # `scripts/setup-release.sh` → generate_keys.
+        SUPublicEDKey: "ykeRjQI9lkvXlDFhqNikH+DrNQSFCO9yV2WP6SP1Xqw="
+        # Don't auto-prompt on first launch — let user opt in via Help menu.
+        SUEnableAutomaticChecks: false
+        # UTI declarations for default-opener registration
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            LSItemContentTypes: [net.daringfireball.markdown, public.plain-text]
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.mdedit.comments
+            UTTypeDescription: MD Editor comments sidecar
+            UTTypeConformsTo: [public.json]
+            UTTypeTagSpecification:
+              public.filename-extension: [comments.json]
+
+  # Standalone non-sandboxed CLI helper.
+  # Ships at MDEditor.app/Contents/Helpers/mdedit; Homebrew cask installs
+  # /usr/local/bin/mdedit as a shim that execs this binary.
+  # See VISION.md "Finder integration" → mdedit CLI.
+  mdedit:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Helpers/mdedit
+      - path: Comments  # shared CommentSidecar + AnchorResolver
+      - path: App/TextCanon.swift
+    dependencies: []
+    settings:
+      base:
+        PRODUCT_NAME: mdedit
+        SKIP_INSTALL: NO
+
+  MDEditorTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests
+        excludes:
+          - "Fixtures/**"
+          - "*.sh"
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdedit.tests
+    dependencies:
+      - target: MDEditor

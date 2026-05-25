@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD Editor</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: white;
+            color: black;
+        }
+        @media (prefers-color-scheme: dark) {
+            html, body { background: #1e1e1e; color: #d4d4d4; }
+        }
+        .cm-editor { height: 100vh; }
+    </style>
+</head>
+<body>
+    <!-- CM6 mounts here via Editor/web/src/editor.ts.
+         `writingsuggestions=true` + `autocorrect=on` + `spellcheck=true` opt the
+         contenteditable surface into macOS Writing Tools and system spell check.
+         This is what gives us Apple Intelligence (Proofread/Rewrite/Summarize)
+         via right-click on a selection — same surface MarkEdit exposes. -->
+    <script src="editor.js"></script>
+</body>
+</html>

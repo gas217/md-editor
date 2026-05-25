@@ -1,0 +1,26 @@
+{
+  "name": "mdedit-editor-web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "CodeMirror 6 editor bundle for MD Editor. Built by esbuild; loaded by Editor/EditorHostViewController.swift into WKWebView. See VISION.md Appendix A for the bridge protocol this implements.",
+  "scripts": {
+    "build": "esbuild src/editor.ts --bundle --minify --format=iife --target=safari17 --outfile=../../build/editor/editor.js",
+    "dev": "esbuild src/editor.ts --bundle --format=iife --target=safari17 --outfile=../../build/editor/editor.js --watch",
+    "ime-corpus": "node scripts/run-ime-corpus.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.21.5",
+    "typescript": "5.4.5"
+  },
+  "dependencies": {
+    "@codemirror/commands": "6.6.0",
+    "@codemirror/lang-html": "6.4.9",
+    "@codemirror/lang-json": "6.0.1",
+    "@codemirror/lang-markdown": "6.2.5",
+    "@codemirror/language": "6.10.2",
+    "@codemirror/search": "^6.5.6",
+    "@codemirror/state": "6.4.1",
+    "@codemirror/view": "6.28.4",
+    "@replit/codemirror-vim": "^6.3.0"
+  }
+}
