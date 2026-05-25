@@ -129,11 +129,11 @@ const surfaceTheme = EditorView.theme({
         backgroundColor: "transparent",
         color: "inherit",
         height: "100vh",
-        // Proportional font for prose; code spans switch to monospace via .cm-inline-code.
-        // Matches MarkEdit's "readable source" model rather than terminal-style mono.
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Helvetica, Arial, sans-serif",
-        fontSize: "14.5px",
-        lineHeight: "1.55",
+        // Typography matches preview-md-shared/Sources/Shared/HTMLTemplate.swift so the
+        // live-edit view and the Quick Look render of the same file look the same.
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif",
+        fontSize: "15px",
+        lineHeight: "1.6",
     },
     ".cm-content": {
         caretColor: "currentColor",
@@ -174,10 +174,20 @@ const commentTheme = EditorView.baseTheme({
     ".cm-comment-resolved": { color: "#66bb6a" },
     // Hybrid live preview: hide markdown syntax markers on non-active lines.
     ".cm-hidden-marker": { display: "none" },
-    // Heading line decorations. Padding makes them feel like sections, not just bold lines.
-    ".cm-h1": { fontSize: "1.7em", fontWeight: "700", lineHeight: "1.25", padding: "0.4em 0 0.2em" },
-    ".cm-h2": { fontSize: "1.4em",  fontWeight: "700", lineHeight: "1.3",  padding: "0.35em 0 0.15em" },
-    ".cm-h3": { fontSize: "1.2em",  fontWeight: "700", padding: "0.3em 0 0.1em" },
+    // Heading line decorations. Sizes mirror preview-md-shared's HTMLTemplate.swift
+    // (h1 2em, h2 1.5em) so the live editor matches the Quick Look render of the
+    // same file. Border-bottom on h1/h2 echoes PreviewMD's section dividers.
+    ".cm-h1": {
+        fontSize: "2em", fontWeight: "700", lineHeight: "1.25",
+        padding: "0.5em 0 0.2em",
+        borderBottom: "1px solid rgba(127,127,127,0.35)",
+    },
+    ".cm-h2": {
+        fontSize: "1.5em", fontWeight: "700", lineHeight: "1.3",
+        padding: "0.4em 0 0.15em",
+        borderBottom: "1px solid rgba(127,127,127,0.22)",
+    },
+    ".cm-h3": { fontSize: "1.25em", fontWeight: "700", padding: "0.3em 0 0.1em" },
     ".cm-h4, .cm-h5, .cm-h6": { fontSize: "1.05em", fontWeight: "700" },
     ".cm-strong": { fontWeight: "700" },
     ".cm-em": { fontStyle: "italic" },
@@ -194,9 +204,9 @@ const commentTheme = EditorView.baseTheme({
 // doesn't decorate it (links, code blocks, blockquotes, lists, HR, etc.).
 // Without this CM6 leaves the markdown source completely flat.
 const mdHighlight = HighlightStyle.define([
-    { tag: t.heading1, fontSize: "1.7em", fontWeight: "700", color: "#e6e6e6" },
-    { tag: t.heading2, fontSize: "1.4em", fontWeight: "700", color: "#e6e6e6" },
-    { tag: t.heading3, fontSize: "1.2em", fontWeight: "700", color: "#e6e6e6" },
+    { tag: t.heading1, fontSize: "2em",   fontWeight: "700", color: "#e6e6e6" },
+    { tag: t.heading2, fontSize: "1.5em", fontWeight: "700", color: "#e6e6e6" },
+    { tag: t.heading3, fontSize: "1.25em", fontWeight: "700", color: "#e6e6e6" },
     { tag: [t.heading4, t.heading5, t.heading6], fontWeight: "700", color: "#e6e6e6" },
     { tag: t.strong, fontWeight: "700" },
     { tag: t.emphasis, fontStyle: "italic" },
