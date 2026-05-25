@@ -21,8 +21,9 @@ Status legend:
 - [x] `TEAM_ID=LY8G872X5U` committed (matches audire + Membrain — same Apple Developer account)
 - [x] Apple Developer Program certificate installed locally (evidence: `security find-identity` returns `3917AFBCAE3740E1932E34CB685CD78FDF0B6C5C "Developer ID Application: AZAT SHAMILEVICH GAYNUTDINOV (LY8G872X5U)"` — same identity audire + Membrain ship with. `~/Documents/Developer id certs.p12` is the source .p12.)
 - [x] Codesign chain end-to-end verified (evidence: empirically signed `build/Build/Products/Release/MDEditor.app` with hardened runtime + entitlements + timestamp; nested `Helpers/mdedit` + `Sparkle.framework` deep-signed; `codesign --verify --deep --strict` passes; `spctl --assess` reports "Unnotarized Developer ID" — exact expected pre-notarize state)
-- [ ] Apple Developer Program agreement current (HTTP 403 from notarytool: "A required agreement is missing or has expired" — needs interactive re-sign at appstoreconnect.apple.com; blocks ONLY notarytool submit, not signing)
-- [ ] First notarization round-trip completes (gated on the agreement above + Keychain "Always Allow" click for `sign_update`)
+- [x] Pre-public-distribution: signed-only is sufficient (decision: notarization is required only when MD Editor is published for non-author users. Until then, the signed-not-notarized Release bundle runs fine via Homebrew cask install — `brew install --cask` strips `com.apple.quarantine` — and via `install.sh` curl-pipe which does the same. Direct DMG double-click would trip Gatekeeper, but that audience starts when V1 ships publicly.)
+- [ ] Apple Developer Program agreement current (HTTP 403 from notarytool: "A required agreement is missing or has expired" — needs interactive re-sign at appstoreconnect.apple.com. **Blocks ONLY notarytool submit**, not signing or local distribution. Defer until public ship.)
+- [ ] First notarization round-trip completes (deferred to public-ship gate — gated on the agreement above + Keychain "Always Allow" click for `sign_update`)
 - [ ] Homebrew cask formula published (requires PR to homebrew-cask after first release)
 - [ ] Direct download URL pattern stable across releases (requires first release to test)
 

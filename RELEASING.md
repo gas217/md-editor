@@ -21,6 +21,11 @@ This is the maintainer's release runbook. Public users don't need this.
 - `APP_STORE_CONNECT_API_KEY` env var set (for `notarytool`).
 - Signing identity name in `~/.zshrc` or equivalent: `export MDEDIT_SIGN_ID="Developer ID Application: Your Name (TEAMID)"`
 
+### Distribution rules
+
+- **Pre-public ship** (author + invited dogfooders): Developer-ID-signed builds are fine. Distribute via Homebrew cask (strips `com.apple.quarantine` on install) or `install.sh` curl-pipe (same). Skip steps 7–9 below until V1 is ready for non-author users.
+- **Public ship** (anyone can download): notarization required. Run the full sequence below. First-time notarize on this machine requires: (a) re-signing the Apple Developer Program agreement at appstoreconnect.apple.com, (b) clicking "Always Allow" on the one-time Keychain modal when `sign_update` first runs.
+
 ### Per-release steps
 
 1. **Dogfood gate.** Run `scripts/dogfood-report.sh` — must show ≥30 qualifying days for V1.0/V1.1; no dogfood requirement for V0.x patch releases.
