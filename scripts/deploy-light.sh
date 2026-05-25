@@ -40,11 +40,21 @@ cp -R "$BUILD_APP" /Applications/MDEditor.app
 # 4. Re-codesign ad-hoc to be safe.
 codesign --force --deep --sign - /Applications/MDEditor.app 2>/dev/null || true
 
-# 5. CLI helper symlink (sudo only if /usr/local/bin isn't writable).
+# 5. CLI helper symlink. Best-effort — never fatal. If /usr/local/bin needs
+# sudo and we're non-interactive (e.g., agent-driven deploy), skip with a
+# hint rather than aborting the whole install. The app works without it; the
+# shim is for `mdedit foo.md` from the terminal.
 if [ -w /usr/local/bin ]; then
     ln -sf /Applications/MDEditor.app/Contents/Helpers/mdedit /usr/local/bin/mdedit
-elif [ -d /usr/local/bin ]; then
-    sudo ln -sf /Applications/MDEditor.app/Contents/Helpers/mdedit /usr/local/bin/mdedit
+    echo "Linked /usr/local/bin/mdedit"
+elif [ -d /usr/local/bin ] && [ -t 0 ]; then
+    # Interactive — sudo can prompt
+    sudo ln -sf /Applications/MDEditor.app/Contents/Helpers/mdedit /usr/local/bin/mdedit \
+        && echo "Linked /usr/local/bin/mdedit"
+else
+    echo "Skipped /usr/local/bin/mdedit symlink — non-interactive shell or /usr/local/bin missing."
+    echo "  To install manually:"
+    echo "    sudo ln -sf /Applications/MDEditor.app/Contents/Helpers/mdedit /usr/local/bin/mdedit"
 fi
 
 # 6. Launch.

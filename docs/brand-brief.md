@@ -61,6 +61,60 @@ not enterprise · not AI-themed (the AI is in the loop, not the brand)
 Picked for fit, pronounceability, and (best guess) `.app` / `.dev` /
 `.com` availability. ★ marks the strongest of the bunch.
 
+### Collision audit
+
+Names struck through have a direct collision in the note / text / PDF /
+markdown app space and should not be used without renaming the incumbent:
+
+- ~~**Sidenote**~~ — SideNotes (Apptorium Mac sticky-notes app)
+- ~~**Skim**~~ — major Mac PDF reader
+- ~~**Vellum**~~ — vellum.pub, Mac book-formatting tool
+- ~~**Quire**~~ — quire.io, project management
+- ~~**Endnote**~~ — Clarivate's reference manager
+- ~~**Tome**~~ — tome.app, AI presentation tool
+- ~~**Nook**~~ — Barnes & Noble e-reader
+- ~~**Halo**~~ — Microsoft franchise
+- ~~**Sparrow**~~ — defunct Mac email client (iconic association)
+
+Names with adjacent baggage (collision in a different domain — usable,
+not clean):
+
+- ⚠ **Hatch** — Hatch sleep/sound brand
+- ⚠ **Codex** — OpenAI Codex + GitHub
+- ⚠ **Postscript** — Adobe language + Postscript.io (SMS marketing)
+- ⚠ **Glance** — Glance workplace AI + various Mac plugins
+- ⚠ **Folio** — Adobe DPS legacy + many
+- ⚠ **Beacon** — overused across spaces
+- ⚠ **Lighthouse** — Google Chrome devtool
+- ⚠ **Waypoint** — Hashicorp deploy tool
+- ⚠ **Mura** — Mura CMS (different space, real product)
+- ⚠ **Pin** — Pinterest, Pinboard
+- ⚠ **Karn** — Magic: The Gathering character
+- ⚠ **Nib** — Apple's `.nib` Interface Builder format
+- ⚠ **Marg** — reads as a person's name
+
+Likely clean (no collision in adjacent space we're aware of):
+
+- ✓ **Margin** — closest is MarginNote (niche Chinese PDF annotator)
+- ✓ **Marginalia**, **Aside**, **Footnote**, **Cairn**, **Codicil**, **Errata**
+- ✓ **Annote**, **Mardo**, **Glanze**
+
+**Caveat:** this audit is a first pass from memory. Before committing to a
+name, run: USPTO trademark search + `.app`/`.com` domain check + Mac App
+Store + Homebrew cask search. Cheap; worth doing.
+
+### Updated shortlist
+
+After strikes:
+
+1. **Margin** — clean enough; MarginNote is the only adjacent name and it's niche
+2. **Cairn** — clean
+3. **Postscript** — usable with the Adobe baggage
+4. **Folio** — usable with the Adobe DPS baggage
+5. **Marginalia** — clean, just long
+
+Coined fallback after re-audit: **Mardo** (Mura was struck for CMS collision).
+
 ### A. Annotation / margin family — the wedge
 
 | Name | Why it works | Why it might not |
