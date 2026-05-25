@@ -10,7 +10,7 @@ import PreviewMDShared
 /// Detect the document's logical format from its filename extension.
 /// V1.1: drives which preview renderer + which CM6 language mode we use.
 enum DocumentFormat: String {
-    case markdown, plain, csv, json, jsonl, html
+    case markdown, plain, csv, json, jsonl, html, pdf
 
     static func from(url: URL?) -> DocumentFormat {
         let ext = (url?.pathExtension ?? "").lowercased()
@@ -20,6 +20,7 @@ enum DocumentFormat: String {
         case "json": return .json
         case "jsonl", "ndjson": return .jsonl
         case "html", "htm": return .html
+        case "pdf": return .pdf
         case "txt", "text", "": return .plain
         default: return .plain
         }
@@ -31,7 +32,7 @@ enum DocumentFormat: String {
         case .markdown: return "markdown"
         case .json, .jsonl: return "json"
         case .html: return "html"
-        case .csv, .plain: return "plain"
+        case .csv, .plain, .pdf: return "plain"
         }
     }
 
@@ -40,18 +41,42 @@ enum DocumentFormat: String {
     var wantsPreviewPane: Bool {
         switch self {
         case .csv, .json, .jsonl, .html: return true
-        case .markdown, .plain: return false
+        case .markdown, .plain, .pdf: return false
         }
+    }
+
+    /// PDF replaces the editor surface entirely with PDFKit (no source mode — PDF is binary).
+    var usesPDFKitFullPane: Bool {
+        self == .pdf
     }
 }
 
 final class MDDocument: NSDocument {
     private(set) var text: String = ""
+    private(set) var rawData: Data?  // for binary formats (PDF) — not decoded as text
     var format: DocumentFormat { DocumentFormat.from(url: fileURL) }
 
     override class var autosavesInPlace: Bool { true }
+    override class var readableTypes: [String] {
+        // Declared in Info.plist via project.yml CFBundleDocumentTypes.
+        // Listing them here lets NSDocumentController accept arbitrary file types
+        // via Open dialog instead of refusing with "MD Editor cannot open files in
+        // the 'X document' format."
+        [
+            "net.daringfireball.markdown", "public.plain-text",
+            "public.comma-separated-values-text", "public.tab-separated-values-text",
+            "public.json", "public.html", "com.adobe.pdf",
+        ]
+    }
 
     override func read(from data: Data, ofType typeName: String) throws {
+        // PDF is binary — store the raw bytes and let PDFKit render from them.
+        if format == .pdf {
+            rawData = data
+            text = ""
+            return
+        }
+        // Other formats are text — including JSON, HTML, CSV in source mode.
         guard let raw = String(data: data, encoding: .utf8) else {
             throw CocoaError(.fileReadCorruptFile)
         }
@@ -60,7 +85,10 @@ final class MDDocument: NSDocument {
     }
 
     override func data(ofType typeName: String) throws -> Data {
-        // LF line endings always for .md/.txt; CSV preserves input terminator (V1.1).
+        // PDF round-trips its original bytes — we don't edit PDFs.
+        if format == .pdf, let raw = rawData {
+            return raw
+        }
         guard let data = text.data(using: .utf8) else {
             throw CocoaError(.fileWriteUnknown)
         }
@@ -115,12 +143,23 @@ final class DocumentSplitViewController: NSSplitViewController {
         self.document = document
         super.init(nibName: nil, bundle: nil)
 
+        // PDF takes the entire window (no CM6 editor — PDF is binary, view-only).
+        // Inspector still sits on the right so comments work.
+        if document.format.usesPDFKitFullPane {
+            let pdfVC = NSHostingController(rootView: PDFViewerView(document: document))
+            addSplitViewItem(NSSplitViewItem(viewController: pdfVC))
+            let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
+            let inspectorItem = NSSplitViewItem(viewController: inspectorVC)
+            inspectorItem.canCollapse = true
+            inspectorItem.minimumThickness = 280
+            addSplitViewItem(inspectorItem)
+            return
+        }
+
         let editorVC = EditorHostViewController(document: document)
         addSplitViewItem(NSSplitViewItem(viewController: editorVC))
 
         // Side preview for CSV/JSON/HTML; comment inspector for .md/.txt.
-        // The inspector replaces the V1.0 NSAlert composer with the spec'd
-        // right-edge sliding panel (per VISION.md "Margin gutter UI").
         let rightVC: NSViewController
         if document.format.wantsPreviewPane {
             rightVC = NSHostingController(rootView: FormatPreviewView(document: document))
@@ -129,7 +168,7 @@ final class DocumentSplitViewController: NSSplitViewController {
         }
         let rightItem = NSSplitViewItem(viewController: rightVC)
         rightItem.canCollapse = true
-        rightItem.isCollapsed = false  // visible by default; Cmd-` will toggle (V1.1)
+        rightItem.isCollapsed = false
         rightItem.minimumThickness = 280
         addSplitViewItem(rightItem)
     }
@@ -173,6 +212,11 @@ struct FormatPreviewView: NSViewRepresentable {
             html = document.text
         case .plain:
             html = "<pre>\(document.text.replacingOccurrences(of: "<", with: "&lt;"))</pre>"
+        case .pdf:
+            // PDF doesn't use this preview surface — DocumentSplitViewController
+            // routes PDFs to PDFViewerView (full pane). This branch is unreachable
+            // in practice but the switch must be exhaustive.
+            html = ""
         }
         wrapper.loadHTML(html)
     }

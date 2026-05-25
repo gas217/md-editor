@@ -66,7 +66,17 @@ private struct WelcomeView: View {
                 .accessibilityHint("Open a markdown, plain text, CSV, JSON, or HTML file from disk")
 
                 Button {
-                    NSDocumentController.shared.newDocument(nil)
+                    // Explicitly create a markdown document — without specifying the
+                    // type, NSDocumentController fails with "No document could be created"
+                    // because multiple readable types are declared.
+                    do {
+                        let doc = try NSDocumentController.shared.makeUntitledDocument(ofType: "net.daringfireball.markdown")
+                        NSDocumentController.shared.addDocument(doc)
+                        doc.makeWindowControllers()
+                        doc.showWindows()
+                    } catch {
+                        NSLog("[mdedit.welcome] New Document failed: \(error)")
+                    }
                 } label: {
                     Label("New Document", systemImage: "square.and.pencil")
                         .frame(maxWidth: .infinity)

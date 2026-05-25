@@ -64,11 +64,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ sender: NSApplication, open urls: [URL]) {
+        NSLog("[mdedit] application(_:open:) called with %d urls", urls.count)
         for url in urls {
+            NSLog("[mdedit] opening: %@", url.path)
             NSDocumentController.shared.openDocument(
                 withContentsOf: url,
                 display: true,
-                completionHandler: { _, _, _ in }
+                completionHandler: { doc, alreadyOpen, error in
+                    if let error {
+                        NSLog("[mdedit] openDocument FAILED for %@: %@", url.path, "\(error)")
+                    } else if doc != nil {
+                        NSLog("[mdedit] openDocument OK for %@", url.path)
+                        WelcomeWindowController.shared.window?.orderOut(nil)
+                    } else {
+                        NSLog("[mdedit] openDocument returned nil with no error for %@", url.path)
+                    }
+                }
             )
         }
     }

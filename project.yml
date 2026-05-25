@@ -68,12 +68,42 @@ targets:
         SUPublicEDKey: "ykeRjQI9lkvXlDFhqNikH+DrNQSFCO9yV2WP6SP1Xqw="
         # Don't auto-prompt on first launch — let user opt in via Help menu.
         SUEnableAutomaticChecks: false
-        # UTI declarations for default-opener registration
+        # UTI declarations for default-opener registration.
+        # CRITICAL: NSDocumentClass must name the Swift class fully-qualified
+        # (Module.Class), otherwise NSDocumentController fails the read with
+        # "X cannot open files in the 'Y' format" — even though Finder shows
+        # MD Editor in the Open With menu.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Markdown Document
+            CFBundleTypeExtensions: [md, markdown, mdown, mkd, mkdn, txt]
             LSItemContentTypes: [net.daringfireball.markdown, public.plain-text]
             CFBundleTypeRole: Editor
             LSHandlerRank: Owner
+            NSDocumentClass: MDEditor.MDDocument
+          - CFBundleTypeName: Tabular Data
+            CFBundleTypeExtensions: [csv, tsv]
+            LSItemContentTypes: [public.comma-separated-values-text, public.tab-separated-values-text]
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            NSDocumentClass: MDEditor.MDDocument
+          - CFBundleTypeName: JSON
+            CFBundleTypeExtensions: [json, jsonl, ndjson]
+            LSItemContentTypes: [public.json]
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            NSDocumentClass: MDEditor.MDDocument
+          - CFBundleTypeName: HTML
+            CFBundleTypeExtensions: [html, htm]
+            LSItemContentTypes: [public.html]
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            NSDocumentClass: MDEditor.MDDocument
+          - CFBundleTypeName: PDF Document
+            CFBundleTypeExtensions: [pdf]
+            LSItemContentTypes: [com.adobe.pdf]
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            NSDocumentClass: MDEditor.MDDocument
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: com.mdedit.comments
             UTTypeDescription: MD Editor comments sidecar
