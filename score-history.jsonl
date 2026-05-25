@@ -31,3 +31,4 @@
 {"timestamp":"2026-05-25T00:21:23Z","avg":92,"min":80,"dims":{"v":94,"e":87,"s":100,"t":100,"a":80,"b":100,"c":100,"h":100,"f":96,"ad":85,"ux":90,"p":80}}
 {"timestamp":"2026-05-25T00:31:43Z","avg":92,"min":79,"dims":{"v":94,"e":87,"s":100,"t":100,"a":80,"b":100,"c":100,"h":100,"f":96,"ad":85,"ux":90,"p":79}}
 {"timestamp":"2026-05-25T01:54:56Z","avg":92,"min":79,"dims":{"v":94,"e":87,"s":100,"t":100,"a":80,"b":100,"c":100,"h":100,"f":96,"ad":85,"ux":90,"p":79}}
+{"timestamp":"2026-05-25T03:51:35Z","avg":"penalty","min":"penalty","note":"-20 to production_readiness for verification-superficiality false-positive; reviewer found app didn't actually open .md files. Root cause: NSDocumentClass missing from CFBundleDocumentTypes. Fixed in commit c7d9d4f92706800afb6d114d198beba63edf5998."}
