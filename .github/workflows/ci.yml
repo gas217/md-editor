@@ -33,6 +33,22 @@ jobs:
         run: ./Tests/BinarySize.sh
         continue-on-error: true
 
+      - name: Run E2E suite
+        # 10 XCUITest scenarios covering open/render/comment/preview per
+        # docs/e2e-test-plan.md — real USE-level gate. Failure here means a
+        # user-visible regression shipped. continue-on-error stays OFF.
+        # Local first-run needs a TCC Automation grant; GitHub Actions
+        # runners auto-grant for test bundles, so this works hands-off.
+        run: make e2e
+
+      - name: Upload E2E result bundle (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-result-xcresult
+          path: build/e2e-result.xcresult
+          if-no-files-found: ignore
+
   score:
     name: Build-readiness score
     runs-on: macos-14
