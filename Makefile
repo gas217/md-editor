@@ -41,13 +41,30 @@ test: project
 ## USE-level scenarios per docs/e2e-test-plan.md.
 ## Drives the app via XCUITest + Accessibility; asserts on the DOM state
 ## that App/E2EBridge.swift exposes when --e2e=1 is passed.
+## NOTE one-time setup: first run pops a TCC Automation prompt for
+## MDEditorE2ETests-Runner.app — approve once in System Settings →
+## Privacy & Security → Automation.
 e2e: project editor-bundle
-	xcodebuild test -project MDEditor.xcodeproj -scheme MDEditor \
+	rm -rf build/e2e-result.xcresult
+	xcodebuild build-for-testing -project MDEditor.xcodeproj -scheme MDEditor \
+	  -configuration Debug -derivedDataPath build \
+	  -only-testing:MDEditorE2ETests 2>&1 | tail -20
+	# xcodebuild's ad-hoc signing preserves the old xctest bundle's Team-ID
+	# metadata, which causes "different Team IDs" dlopen failures inside the
+	# runner. Re-sign the whole runner tree without preserve-metadata so all
+	# embedded code ends up with no team identifier (ad-hoc = no team).
+	codesign --force --deep --sign - \
+	  build/Build/Products/Debug/MDEditorE2ETests-Runner.app 2>&1 | tail -2
+	xcodebuild test-without-building -project MDEditor.xcodeproj -scheme MDEditor \
 	  -configuration Debug -derivedDataPath build \
 	  -only-testing:MDEditorE2ETests \
 	  -resultBundlePath build/e2e-result.xcresult \
-	  | xcbeautify || true
+	  2>&1 | tail -40 || true
 	@echo "Result bundle: build/e2e-result.xcresult"
+	@if [ -d build/e2e-result.xcresult ]; then \
+	  echo "--- summary ---"; \
+	  xcrun xcresulttool get test-results summary --path build/e2e-result.xcresult 2>/dev/null | head -40 || true; \
+	fi
 
 score:
 	@./scripts/score.sh

@@ -107,10 +107,19 @@ final class E2EBridge {
         field.setAccessibilityIdentifier("e2e-state")
         field.setAccessibilityLabel("E2E state JSON")
         field.setAccessibilityRole(.staticText)
-        field.frame = NSRect(x: 0, y: 0, width: 1, height: 1)
-        field.alphaValue = 0.01   // visually hidden but still in AX tree
+        // Tiny but visible (alpha 1) so XCUITest's accessibility scan doesn't
+        // skip it as zero-size/hidden. Top-right corner so it doesn't overlap
+        // user content visually — width 1 height 1 makes it imperceptible.
         field.isHidden = false
+        field.alphaValue = 1.0
+        field.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(field)
+        NSLayoutConstraint.activate([
+            field.widthAnchor.constraint(equalToConstant: 1),
+            field.heightAnchor.constraint(equalToConstant: 1),
+            field.topAnchor.constraint(equalTo: content.topAnchor),
+            field.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+        ])
         stateFields[id] = field
         NSLog("[mdedit.e2e] injected e2e-state into window: %@", window.title)
     }
@@ -125,20 +134,24 @@ final class E2EBridge {
             field.stringValue = "{}"
             return
         }
+        // Read straight from the rendered DOM — no dependency on window.view
+        // (whose exposure has been fragile across CM6 mount paths). cm-content
+        // is CM6's text wrapper; its textContent is the live document buffer.
         let probe = """
         (function () {
             try {
                 const h1 = document.querySelectorAll('.cm-h1').length;
                 const h2 = document.querySelectorAll('.cm-h2').length;
                 const code = document.querySelectorAll('.cm-inline-code').length;
-                const docText = window.view ? window.view.state.doc.toString() : '';
+                const content = document.querySelector('.cm-content');
+                const docLen = content ? (content.textContent || '').length : 0;
                 const gutterBg = (function() {
                     const g = document.querySelector('.cm-gutters');
                     return g ? getComputedStyle(g).backgroundColor : '';
                 })();
                 return JSON.stringify({
                     h1: h1, h2: h2, code: code,
-                    docLen: docText.length,
+                    docLen: docLen,
                     gutterBg: gutterBg,
                 });
             } catch (e) { return '{"err":"' + e.message + '"}'; }

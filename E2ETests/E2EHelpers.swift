@@ -27,17 +27,30 @@ extension XCUIApplication {
     }
 
     /// Pull the JSON state the E2EBridge polls into the AX field, decoded.
+    /// The field is an offscreen NSTextField injected into the doc window
+    /// by App/E2EBridge.swift on NSWindow.didBecomeKeyNotification.
     func readE2EState(timeout: TimeInterval = 5,
                       line: UInt = #line, file: StaticString = #file) -> [String: Any] {
-        // The field is a child of the status-bar item.
-        let predicate = NSPredicate(format: "identifier == 'e2e-state'")
-        let element = staticTexts.containing(predicate).firstMatch
+        // Subscript by identifier — XCUITest maps NSElement subscript to
+        // accessibility identifier. Scope to the key window's tree.
+        let element = windows.firstMatch.staticTexts["e2e-state"]
         if !element.waitForExistence(timeout: timeout) {
-            XCTFail("e2e-state AX field never appeared (E2EBridge not attached?)",
-                    file: file, line: line)
-            return [:]
+            // Fall back to app-scope in case the field landed outside a window.
+            let appScope = staticTexts["e2e-state"]
+            if !appScope.waitForExistence(timeout: 1) {
+                XCTFail("e2e-state AX field never appeared (E2EBridge not attached?)",
+                        file: file, line: line)
+                return [:]
+            }
+            return decodeStateField(appScope, file: file, line: line)
         }
-        let raw = (element.value as? String) ?? "{}"
+        return decodeStateField(element, file: file, line: line)
+    }
+
+    private func decodeStateField(_ element: XCUIElement,
+                                  file: StaticString, line: UInt) -> [String: Any] {
+        let raw = (element.value as? String) ?? ""
+        if raw.isEmpty { return [:] }
         guard let data = raw.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
