@@ -7,6 +7,7 @@ help:
 	@echo "  make editor-bundle        Build the CodeMirror 6 bundle (esbuild)"
 	@echo "  make build                Build Debug configuration (depends on editor-bundle)"
 	@echo "  make test                 Run unit tests"
+	@echo "  make e2e                  Run XCUITest USE-level scenarios (docs/e2e-test-plan.md)"
 	@echo "  make score                Run scripts/score.sh; report current build-readiness metrics"
 	@echo "  make baseline             Run scripts/measure-markedit-baseline.sh; write baselines.json"
 	@echo "  make clean                Remove build artifacts"

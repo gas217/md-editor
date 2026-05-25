@@ -1,8 +1,8 @@
 # MD Editor
 
-A lightweight native macOS viewer + light-editor for the text formats AI agents produce — `.md`, `.txt`, `.csv`, `.json`, `.html`, and (V2) `.pdf` — with first-class commenting and a Claude-style agent loop.
+A lightweight native macOS viewer + light-editor for the text formats AI agents produce — `.md`, `.txt`, `.csv`, `.json`, `.html`, `.pdf` — with first-class commenting and a Claude-style agent loop.
 
-**Status:** pre-V1.0. The vision is locked (see [VISION.md](VISION.md)); the build is starting.
+**Status:** pre-V1.0, but the core surface works. Markdown renders (CodeMirror 6 + Obsidian-style hybrid live preview, sized to match the [preview-md](https://github.com/gas217/preview-md) Quick Look extension exactly). Commenting wedge ships: ⌘⇧M + a visible toolbar button create comments anchored via W3C-style selectors and persisted to sidecar JSON for agent consumption. CSV/JSON/HTML get a preview pane; PDFs use PDFKit. 10-scenario XCUITest suite gates regressions of the user-visible behaviour.
 
 ## What this is
 
@@ -22,21 +22,53 @@ See [VISION.md](VISION.md) for the full thesis, design principles, competitive p
 ## Quick links
 
 - **[VISION.md](VISION.md)** — what we're building and why (~700 lines, opinionated)
+- **[docs/e2e-test-plan.md](docs/e2e-test-plan.md)** — the 13 USE-level scenarios the XCUITest suite gates against
 - **[METRICS.md](METRICS.md)** — the build-readiness rubric we hill-climb against
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — how to help
-- **Sibling project: [preview-md](https://github.com/gas217/preview-md)** — Quick Look extension that ships the same rendering engine
+- **Sibling project: [preview-md](https://github.com/gas217/preview-md)** — Quick Look extension that ships the same rendering engine (typography mirrored exactly via `preview-md-shared`)
 
-## Build
-
-Requires macOS 14+, Xcode 15+, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+## Try it
 
 ```bash
 brew install xcodegen
-make project   # generate MDEditor.xcodeproj from project.yml
-make build     # build Debug
-make test      # run unit tests
-make score     # print current build-readiness rubric scores
+make build                                    # builds + bundles the CM6 editor
+./scripts/deploy-light.sh                     # installs to /Applications, ad-hoc signed
+open -a MDEditor path/to/file.md              # markdown with hybrid live preview
+open -a MDEditor path/to/data.csv             # csv with table preview
+open -a MDEditor path/to/payload.json         # json with tree preview
 ```
+
+⌘⇧M with text selected → comment composer. Save with ⌘↩. Sidecar lands at `path/to/file.md.comments.json`.
+
+Window opens at 1/3 width × full screen height on displays ≥2500 px, otherwise 1/2 width.
+
+## Build targets
+
+```
+make project              Generate MDEditor.xcodeproj from project.yml (requires xcodegen)
+make install-editor-deps  npm install in Editor/web/
+make editor-bundle        Build the CodeMirror 6 bundle (esbuild)
+make build                Build Debug configuration (depends on editor-bundle)
+make test                 Run unit tests (78 currently green)
+make e2e                  Run XCUITest scenarios — see docs/e2e-test-plan.md
+make score                Run scripts/score.sh; report current build-readiness metrics
+make baseline             Run scripts/measure-markedit-baseline.sh; write baselines.json
+make dist                 Build distributable Debug bundle (no notarization)
+make release              Release build + sign + notarize (requires MDEDIT_APPLE_ID env)
+make clean                Remove build artifacts
+```
+
+## Testing
+
+Three layers:
+
+| layer | tool | what it gates |
+|---|---|---|
+| unit | XCTest (`make test`) | TextCanon, AnchorResolver, CSV/JSON parsing, comment serialisation |
+| e2e USE | XCUITest (`make e2e`) | 10 scenarios across .md/.csv/.json/.html/.pdf — see [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
+| build-readiness | `make score` | 12-dimensional rubric, target 95% avg / 80% min |
+
+E2E first-run setup: macOS will pop a TCC Automation prompt for `MDEditorE2ETests-Runner.app`; approve once in System Settings → Privacy & Security → Automation. Subsequent runs are silent.
 
 ## Current readiness score
 
