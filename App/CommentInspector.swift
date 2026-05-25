@@ -118,6 +118,7 @@ struct CommentInspectorContainer: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        .accessibilityIdentifier("inspectorHeader")
     }
 }
 
@@ -179,6 +180,7 @@ struct ComposerView: View {
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                 )
                 .accessibilityLabel("Comment body")
+                .accessibilityIdentifier("composerBody")
                 .accessibilityHint("Type your comment. Mention @claude to route to Claude. Use #tags to triage.")
 
             if !detectedMentions.isEmpty || !detectedTags.isEmpty {
@@ -214,15 +216,18 @@ struct ComposerView: View {
             HStack {
                 Button("Cancel", action: onDismiss)
                     .keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("composerCancel")
                 Spacer()
                 Button("Save", action: save)
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(commentBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .controlSize(.large)
                     .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("composerSave")
             }
         }
         .padding(14)
+        .accessibilityIdentifier("composerPane")
         .onAppear { focused = true }
     }
 

@@ -1,4 +1,4 @@
-.PHONY: project build test score scaffold clean help baseline editor-bundle install-editor-deps dist release
+.PHONY: project build test e2e score scaffold clean help baseline editor-bundle install-editor-deps dist release
 
 help:
 	@echo "MD Editor — make targets"
@@ -37,6 +37,17 @@ build: project editor-bundle
 test: project
 	xcodebuild -project MDEditor.xcodeproj -scheme MDEditor -configuration Debug -derivedDataPath build build-for-testing
 	xcrun xctest build/Build/Products/Debug/MDEditorTests.xctest
+
+## USE-level scenarios per docs/e2e-test-plan.md.
+## Drives the app via XCUITest + Accessibility; asserts on the DOM state
+## that App/E2EBridge.swift exposes when --e2e=1 is passed.
+e2e: project editor-bundle
+	xcodebuild test -project MDEditor.xcodeproj -scheme MDEditor \
+	  -configuration Debug -derivedDataPath build \
+	  -only-testing:MDEditorE2ETests \
+	  -resultBundlePath build/e2e-result.xcresult \
+	  | xcbeautify || true
+	@echo "Result bundle: build/e2e-result.xcresult"
 
 score:
 	@./scripts/score.sh

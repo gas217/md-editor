@@ -144,3 +144,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mdedit.tests
     dependencies:
       - target: MDEditor
+
+  # USE-level scenarios per docs/e2e-test-plan.md. Drives the app via Accessibility;
+  # asserts on AX state field populated by App/E2EBridge.swift in --e2e=1 mode.
+  MDEditorE2ETests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: E2ETests
+        excludes:
+          - "Fixtures/**"
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.mdedit.e2etests
+        TEST_TARGET_NAME: MDEditor
+    dependencies:
+      - target: MDEditor

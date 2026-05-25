@@ -98,7 +98,13 @@ verification_score() {
     fi
   fi
   # `make score` target exists
-  [[ -f Makefile ]] && grep -qE "^score:" Makefile && score=$((score + 30))
+  [[ -f Makefile ]] && grep -qE "^score:" Makefile && score=$((score + 20))
+  # `make e2e` target + a real XCUITest scaffolding gates user-visible behaviour
+  # — the layer the existing 78 unit tests do NOT cover. Counts for 10.
+  if [[ -f Makefile ]] && grep -qE "^e2e:" Makefile && [[ -d E2ETests ]] && \
+     [[ -f E2ETests/Scenarios.swift ]] && [[ -f App/E2EBridge.swift ]]; then
+    score=$((score + 10))
+  fi
   echo $score
 }
 

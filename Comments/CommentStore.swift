@@ -77,9 +77,16 @@ enum CommentStore {
     }
 
     private static func sidecarURL(for documentURL: URL) -> URL {
-        // foo.md → foo.md.comments.json (sibling, same basename + .comments.json)
-        let parent = documentURL.deletingLastPathComponent()
         let name = documentURL.lastPathComponent + ".comments.json"
+        // E2E test mode (env MDEDIT_E2E_TMP=<path>) redirects sidecars into a
+        // test-owned temp dir so tests can't pollute the user's real ~/Repoes.
+        // Read env directly so this stays usable from the CLI target which
+        // doesn't link against the App's E2EBridge symbol.
+        if let override = ProcessInfo.processInfo.environment["MDEDIT_E2E_TMP"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+                .appendingPathComponent(name)
+        }
+        let parent = documentURL.deletingLastPathComponent()
         return parent.appendingPathComponent(name)
     }
 }

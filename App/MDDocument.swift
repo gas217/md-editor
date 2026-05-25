@@ -187,6 +187,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate {
             item.target = MenuActions.shared
             item.action = #selector(MenuActions.addComment(_:))
             item.isBordered = true
+            item.view?.setAccessibilityIdentifier("addCommentButton")
             return item
         case Self.toggleInspectorId:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -198,6 +199,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate {
             item.target = MenuActions.shared
             item.action = #selector(MenuActions.toggleInspector(_:))
             item.isBordered = true
+            item.view?.setAccessibilityIdentifier("toggleInspectorButton")
             return item
         default:
             return nil

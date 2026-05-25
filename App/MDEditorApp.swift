@@ -26,6 +26,19 @@ struct MDEditorApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sessionStart: Date?
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Parse e2e launch args BEFORE any window/document setup so test mode
+        // can redirect sidecar paths and stage fixtures before things race.
+        E2EBridge.shared.parseLaunchArgs()
+        // In e2e mode, suppress state restoration — tests must be hermetic.
+        // (Without this, macOS happily reopens whatever doc was open last time
+        // alongside the fixture, which fails assertions about window count.)
+        if E2EBridge.shared.isEnabled {
+            UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+            UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Preload editor WebView process to shave 150-250 ms off cold launch.
         // See VISION.md "WKWebView process model & memory budget reconciliation".
@@ -46,9 +59,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Add Edit → Add Comment on Selection (⌘⇧M) so the shortcut is discoverable.
         AppMenu.installAddCommentItem()
 
+        // E2E test mode: attach test bridge AFTER all other init so AX state field
+        // is reachable + start polling the focused doc.
+        E2EBridge.shared.attachToActiveApplication()
+
         // Welcome window if no document was opened from launch arguments.
-        DispatchQueue.main.async {
-            WelcomeWindowController.shared.showIfNeeded()
+        // Suppressed in e2e mode (tests open fixtures explicitly).
+        if !E2EBridge.shared.isEnabled {
+            DispatchQueue.main.async {
+                WelcomeWindowController.shared.showIfNeeded()
+            }
         }
     }
 

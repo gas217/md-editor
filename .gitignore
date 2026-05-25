@@ -36,3 +36,4 @@ dist/
 # Test artifacts
 drift-report.json
 *.xctestplan.bak
+default.profraw
