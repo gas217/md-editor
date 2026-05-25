@@ -19,8 +19,10 @@ Status legend:
 - [x] App Store submission decision recorded (evidence: VISION.md "Decided Open Questions" — direct + Homebrew first, App Store deferred; consistent with audire decision 08f02bd1)
 - [x] One-time setup script for keychain profile + Sparkle keys (evidence: `scripts/setup-release.sh`)
 - [x] `TEAM_ID=LY8G872X5U` committed (matches audire + Membrain — same Apple Developer account)
-- [ ] Apple Developer Program enrollment used + certificate installed locally (requires running developer to have the `Developer ID Application: ... (LY8G872X5U)` cert from audire/Membrain installed)
-- [ ] First notarization round-trip completes (requires `make release` with `MDEDIT_APPLE_ID=...` set)
+- [x] Apple Developer Program certificate installed locally (evidence: `security find-identity` returns `3917AFBCAE3740E1932E34CB685CD78FDF0B6C5C "Developer ID Application: AZAT SHAMILEVICH GAYNUTDINOV (LY8G872X5U)"` — same identity audire + Membrain ship with. `~/Documents/Developer id certs.p12` is the source .p12.)
+- [x] Codesign chain end-to-end verified (evidence: empirically signed `build/Build/Products/Release/MDEditor.app` with hardened runtime + entitlements + timestamp; nested `Helpers/mdedit` + `Sparkle.framework` deep-signed; `codesign --verify --deep --strict` passes; `spctl --assess` reports "Unnotarized Developer ID" — exact expected pre-notarize state)
+- [ ] Apple Developer Program agreement current (HTTP 403 from notarytool: "A required agreement is missing or has expired" — needs interactive re-sign at appstoreconnect.apple.com; blocks ONLY notarytool submit, not signing)
+- [ ] First notarization round-trip completes (gated on the agreement above + Keychain "Always Allow" click for `sign_update`)
 - [ ] Homebrew cask formula published (requires PR to homebrew-cask after first release)
 - [ ] Direct download URL pattern stable across releases (requires first release to test)
 
