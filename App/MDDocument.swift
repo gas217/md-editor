@@ -119,12 +119,18 @@ final class MDDocument: NSDocument {
 final class DocumentWindowController: NSWindowController {
     init(document: MDDocument) {
         let window = NSWindow(
-            contentRect: .init(x: 0, y: 0, width: 1000, height: 700),
+            contentRect: .init(x: 0, y: 0, width: 1100, height: 720),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = document.displayName ?? "Untitled"
+        window.minSize = NSSize(width: 560, height: 360)
+        window.center()
+        // Persist the window frame per-document type but ignore size on a fresh
+        // doc — prevents the "tiny window in the corner" state-restoration bug
+        // by setting a sensible default that user adjustments override.
+        window.setFrameAutosaveName("MDEditorDocumentWindow")
         super.init(window: window)
         window.contentViewController = DocumentSplitViewController(document: document)
     }
@@ -133,62 +139,127 @@ final class DocumentWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError() }
 }
 
-/// Editor on the left + (optional) preview on the right + status bar at the bottom.
-/// CSV/JSON/HTML auto-open the preview pane; markdown uses inline hybrid live preview.
-final class DocumentSplitViewController: NSSplitViewController {
+/// Top: NSSplitView (editor + lazy right pane). Bottom: status bar.
+/// Inspector pane is COLLAPSED by default on .md/.txt — it auto-expands when
+/// the user fires Cmd-Shift-M or clicks a gutter dot.
+final class DocumentSplitViewController: NSViewController {
     private let document: MDDocument
     private let statusBar = StatusBarController()
+    private var splitVC: NSSplitViewController!
+    private var inspectorItem: NSSplitViewItem?
+    private var observers: [NSObjectProtocol] = []
 
     init(document: MDDocument) {
         self.document = document
         super.init(nibName: nil, bundle: nil)
-
-        // PDF takes the entire window (no CM6 editor — PDF is binary, view-only).
-        // Inspector still sits on the right so comments work.
-        if document.format.usesPDFKitFullPane {
-            let pdfVC = NSHostingController(rootView: PDFViewerView(document: document))
-            addSplitViewItem(NSSplitViewItem(viewController: pdfVC))
-            let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
-            let inspectorItem = NSSplitViewItem(viewController: inspectorVC)
-            inspectorItem.canCollapse = true
-            inspectorItem.minimumThickness = 280
-            addSplitViewItem(inspectorItem)
-            return
-        }
-
-        let editorVC = EditorHostViewController(document: document)
-        addSplitViewItem(NSSplitViewItem(viewController: editorVC))
-
-        // Side preview for CSV/JSON/HTML; comment inspector for .md/.txt.
-        let rightVC: NSViewController
-        if document.format.wantsPreviewPane {
-            rightVC = NSHostingController(rootView: FormatPreviewView(document: document))
-        } else {
-            rightVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
-        }
-        let rightItem = NSSplitViewItem(viewController: rightVC)
-        rightItem.canCollapse = true
-        rightItem.isCollapsed = false
-        rightItem.minimumThickness = 280
-        addSplitViewItem(rightItem)
     }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        // Wire the status bar.
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    deinit {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+    }
+
+    override func loadView() {
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 1100, height: 720))
+        view.autoresizingMask = [.width, .height]
+
+        splitVC = NSSplitViewController()
+        splitVC.splitView.dividerStyle = .thin
+        configureSplit()
+        addChild(splitVC)
+
+        view.addSubview(splitVC.view)
         view.addSubview(statusBar.view)
+        splitVC.view.translatesAutoresizingMaskIntoConstraints = false
         statusBar.view.translatesAutoresizingMaskIntoConstraints = false
+
         NSLayoutConstraint.activate([
+            // Split view fills the top, stops at the status bar.
+            splitVC.view.topAnchor.constraint(equalTo: view.topAnchor),
+            splitVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            splitVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            splitVC.view.bottomAnchor.constraint(equalTo: statusBar.view.topAnchor),
+
+            // Status bar pinned to the bottom.
             statusBar.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             statusBar.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             statusBar.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             statusBar.view.heightAnchor.constraint(equalToConstant: 22),
         ])
         statusBar.observe()
+
+        // Auto-expand inspector when user wants to add or view a comment.
+        // The inspector is hidden by default for .md/.txt — only the editor shows
+        // on first open. Cmd-Shift-M or clicking a gutter dot reveals it.
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: .mdeditCommentRequested, object: nil, queue: .main
+            ) { [weak self] _ in self?.revealInspector() }
+        )
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: .mdeditCommentClicked, object: nil, queue: .main
+            ) { [weak self] _ in self?.revealInspector() }
+        )
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
+    private func configureSplit() {
+        // PDF: full-pane PDFKit on the left, inspector on the right (hidden by default).
+        if document.format.usesPDFKitFullPane {
+            let pdfVC = NSHostingController(rootView: PDFViewerView(document: document))
+            let mainItem = NSSplitViewItem(viewController: pdfVC)
+            mainItem.minimumThickness = 320
+            mainItem.holdingPriority = .defaultLow + 1  // keep the doc, not the inspector
+            splitVC.addSplitViewItem(mainItem)
+
+            let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
+            let item = NSSplitViewItem(viewController: inspectorVC)
+            item.canCollapse = true
+            item.isCollapsed = true            // hidden by default
+            item.minimumThickness = 280
+            item.maximumThickness = 420
+            item.holdingPriority = .defaultLow  // inspector yields width to PDF
+            splitVC.addSplitViewItem(item)
+            inspectorItem = item
+            return
+        }
+
+        // .md/.txt: editor pane is primary; inspector hidden by default.
+        // .csv/.json/.html: editor + format-specific preview, preview visible by default.
+        let editorVC = EditorHostViewController(document: document)
+        let editorItem = NSSplitViewItem(viewController: editorVC)
+        editorItem.minimumThickness = 320
+        editorItem.holdingPriority = .defaultLow + 1  // editor keeps its width
+        splitVC.addSplitViewItem(editorItem)
+
+        let rightVC: NSViewController
+        let collapsedByDefault: Bool
+        if document.format.wantsPreviewPane {
+            rightVC = NSHostingController(rootView: FormatPreviewView(document: document))
+            collapsedByDefault = false  // preview is the point for csv/json/html
+        } else {
+            rightVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
+            collapsedByDefault = true   // inspector is on-demand for .md/.txt
+        }
+        let rightItem = NSSplitViewItem(viewController: rightVC)
+        rightItem.canCollapse = true
+        rightItem.isCollapsed = collapsedByDefault
+        rightItem.minimumThickness = 280
+        rightItem.maximumThickness = 480
+        rightItem.holdingPriority = .defaultLow
+        splitVC.addSplitViewItem(rightItem)
+        inspectorItem = rightItem
+    }
+
+    private func revealInspector() {
+        guard let item = inspectorItem, item.isCollapsed else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.allowsImplicitAnimation = true
+            item.animator().isCollapsed = false
+        }
+    }
 }
 
 /// Lazy preview renderer. Picks CSV / JSON / Markdown renderer based on document format.

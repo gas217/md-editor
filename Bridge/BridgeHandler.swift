@@ -13,12 +13,19 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
     private var pendingReplies: [String: (Result<Any?, Error>) -> Void] = [:]
     private let timeoutSeconds: TimeInterval = 5
 
+    /// Sticky once we've delivered the initial document to the JS side.
+    /// CM6 sometimes re-broadcasts `editor.ready` after a doc swap; without
+    /// this guard, ready→doc.load→ready becomes a tight CPU loop pinning the
+    /// main thread at 50–60 %.
+    private var didSendInitialLoad = false
+
     init(document: MDDocument) {
         self.document = document
     }
 
     func attach(to webView: WKWebView) {
         self.webView = webView
+        didSendInitialLoad = false  // fresh WKWebView ⇒ JS will legitimately rebroadcast ready
     }
 
     // MARK: JS → Swift
@@ -41,6 +48,8 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
 
         switch type {
         case "editor.ready":
+            guard !didSendInitialLoad else { return }
+            didSendInitialLoad = true
             sendDocLoad()
         case "doc.changed":
             if let p = payload as? [String: Any], let text = p["text"] as? String {
