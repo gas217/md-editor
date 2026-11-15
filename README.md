@@ -2,7 +2,7 @@
 
 A lightweight native macOS viewer + light-editor for the text formats AI agents produce — `.md`, `.txt`, `.csv`, `.json`, `.html`, `.pdf` — with first-class commenting and a Claude-style agent loop.
 
-**Status:** pre-V1.0; core features are implemented, with verification gaps listed below. Markdown renders (CodeMirror 6 + Obsidian-style hybrid live preview, with typography based on the [preview-md](https://github.com/gas217/preview-md) Quick Look extension). Commenting is implemented: ⌘⇧M + a visible toolbar button create comments anchored via W3C-style selectors and persisted to sidecar JSON for agent consumption. CSV/JSON/HTML get a preview pane; PDFs use PDFKit. The XCUITest target contains 10 tests with partial coverage of the 13 planned scenarios; see [the coverage table](docs/e2e-test-plan.md).
+**Status:** pre-V1.0; core features are implemented, with verification gaps listed below. Markdown renders (CodeMirror 6 + Obsidian-style hybrid live preview, with typography based on the [preview-md](https://github.com/gas217/preview-md) Quick Look extension). Commenting is implemented: ⌘⇧M + a visible toolbar button create comments anchored via W3C-style selectors and persisted to sidecar JSON for agent consumption. CSV/JSON/HTML get a preview pane; PDFs use PDFKit. The XCUITest target contains 11 tests with partial coverage of the 13 planned scenarios; see [the coverage table](docs/e2e-test-plan.md).
 
 ## What this is
 
@@ -41,7 +41,7 @@ open -a MDEditor path/to/data.csv             # csv with table preview
 open -a MDEditor path/to/payload.json         # json with tree preview
 ```
 
-⌘⇧M with text selected → comment composer. Save with ⌘↩. Sidecar lands at `path/to/file.md.comments.json`.
+⌘⇧M with text selected → comment composer. Save with ⌘↩. Sidecar lands at `path/to/file.md.comments.json`. The saved thread opens immediately; click its margin marker to return to it. Reopen the file to load agent replies and resolved states.
 
 Window opens at 1/3 width × full screen height on displays ≥2500 px, otherwise 1/2 width.
 
@@ -69,12 +69,12 @@ Three layers:
 | layer | tool | what it gates |
 |---|---|---|
 | unit | XCTest (`make test`) | TextCanon, AnchorResolver, CSV/JSON parsing, comment serialisation |
-| e2e USE | XCUITest (`make e2e`) | 10 tests, with incomplete assertions and 3 unimplemented scenarios — see [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
+| e2e USE | XCUITest (`make e2e`) | 11 tests, including comment creation and thread navigation; remaining gaps — see [docs/e2e-test-plan.md](docs/e2e-test-plan.md) |
 | build-readiness | `make score` | 12-dimensional rubric, target 95% avg / 80% min |
 
 Additional checks: `swift test --package-path Vendor/preview-md-shared` runs the renderer tests; `python3 scripts/test-build-harness.py` checks build/test failure reporting without Xcode.
 
-Local reconciliation results (2026-11-09, Xcode 26.4.1):
+Historical reconciliation results (2026-11-09, Xcode 26.4.1; see [current validation evidence](docs/e2e-test-plan.md#validation-evidence) for the expanded suite):
 
 - Debug and Release app/CLI builds pass using the included renderer. The Release
   size check passes the 15 MB ceiling, with a warning above the 10 MB target.

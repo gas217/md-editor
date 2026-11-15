@@ -99,7 +99,8 @@ task lists, images, and frontmatter either render correctly when claimed or have
 a legible, honest fallback. Source text remains recoverable. The hybrid editor
 reveals syntax consistently around editing; source and rendered text do not
 overlap, duplicate, or disappear. Moving the caret does not jump to another
-paragraph. The gutter matches the surface in light and dark mode.
+paragraph. Verify rendering in both light and dark appearance; surface styling
+is scored separately under V5.
 
 **Stress for 4:** inspect the same document at the app's minimum window size,
 ordinary laptop size, and a wide display, with the inspector open and closed.
@@ -108,8 +109,9 @@ not clip the status bar or comment composer. Screenshots before/after selection
 show no unexplained scroll jump greater than one body-text line. A reader can
 identify the heading hierarchy and find a named section without opening source.
 
-**A 2 looks like:** readable text with a white gutter strip in dark mode,
-overlapping status text, broken wrapping, or syntax hiding that removes content.
+**A 2 looks like:** Markdown content is duplicated, inaccessible because of broken
+wrapping, or removed by syntax hiding. Cosmetic gutter or typography defects
+belong in the separate visual score.
 Check the visible editor: the separate shared renderer producing correct HTML
 does not prove that the CodeMirror editor looks correct.
 
