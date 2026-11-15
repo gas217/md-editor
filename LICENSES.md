@@ -6,11 +6,15 @@ MD Editor ships under MIT (see `LICENSE`). The binary links the following depend
 
 | Package | Version | License | Source |
 |---|---|---|---|
-| preview-md-shared | local (this repo's sibling) | MIT | `../preview-md-shared/LICENSE` |
-| swift-markdown (planned, Story 0a) | TBD | Apache-2.0 | https://github.com/apple/swift-markdown |
-| Yams (planned, Story 0a) | TBD | MIT | https://github.com/jpsim/Yams |
+| preview-md-shared | included snapshot | MIT | `Vendor/preview-md-shared/LICENSE` |
+| swift-markdown | 0.8.0 in the verified build | Apache-2.0 | https://github.com/apple/swift-markdown |
+| Yams | 5.4.0 in the verified build | MIT | https://github.com/jpsim/Yams |
 
-## JavaScript dependencies (bundled into Editor/web/editor.js)
+| Sparkle | 2.9.2 in the verified build | MIT | https://github.com/sparkle-project/Sparkle |
+
+Swift package requirements are defined in `project.yml` and the included package manifest; compatible versions may resolve differently on a fresh checkout.
+
+## JavaScript dependencies (bundled into build/editor/editor.js)
 
 | Package | Version | License | Source |
 |---|---|---|---|
@@ -22,6 +26,9 @@ MD Editor ships under MIT (see `LICENSE`). The binary links the following depend
 | @codemirror/lang-html | 6.4.9 | MIT | https://github.com/codemirror/lang-html |
 | @codemirror/search | 6.5.6 | MIT | https://github.com/codemirror/search |
 | @codemirror/language | 6.10.2 | MIT | https://github.com/codemirror/language |
+| @replit/codemirror-vim | 6.3.0 | MIT | https://github.com/replit/codemirror-vim |
+
+Exact JavaScript dependency versions (including transitive dependencies) are recorded in `Editor/web/package-lock.json`.
 
 ## Build-only dependencies (not shipped in the binary)
 

@@ -1,11 +1,15 @@
-.PHONY: project build test e2e score scaffold clean help baseline editor-bundle install-editor-deps dist release
+# macOS ships GNU Make 3.81, which does not honor .SHELLFLAGS.
+SHELL := /bin/bash -eu -o pipefail
+
+.PHONY: project build build-release test e2e score clean help baseline editor-bundle install-editor-deps dist release
 
 help:
 	@echo "MD Editor — make targets"
 	@echo "  make project              Generate MDEditor.xcodeproj from project.yml (requires xcodegen)"
-	@echo "  make install-editor-deps  npm install in Editor/web/"
+	@echo "  make install-editor-deps  npm ci in Editor/web/ (locked dependencies)"
 	@echo "  make editor-bundle        Build the CodeMirror 6 bundle (esbuild)"
 	@echo "  make build                Build Debug configuration (depends on editor-bundle)"
+	@echo "  make build-release        Build Release app + CLI (without distribution steps)"
 	@echo "  make test                 Run unit tests"
 	@echo "  make e2e                  Run XCUITest USE-level scenarios (docs/e2e-test-plan.md)"
 	@echo "  make score                Run scripts/score.sh; report current build-readiness metrics"
@@ -16,7 +20,7 @@ project:
 	xcodegen generate
 
 install-editor-deps:
-	cd Editor/web && npm install
+	cd Editor/web && npm ci --no-audit --no-fund
 
 editor-bundle: install-editor-deps
 	mkdir -p build/editor
@@ -29,15 +33,23 @@ build: project editor-bundle
 	xcodebuild -project MDEditor.xcodeproj -scheme mdedit -configuration Debug -derivedDataPath build build
 	# Copy the CM6 bundle into the .app's Resources so Bundle.main.url(forResource:) finds it.
 	mkdir -p build/Build/Products/Debug/MDEditor.app/Contents/Resources
-	cp -f build/editor/editor.html build/editor/editor.js build/Build/Products/Debug/MDEditor.app/Contents/Resources/ 2>/dev/null || true
+	cp -f build/editor/editor.html build/editor/editor.js build/Build/Products/Debug/MDEditor.app/Contents/Resources/
 	# Install the CLI helper into the .app bundle so RELEASING.md's claim
 	# "MDEditor.app/Contents/Helpers/mdedit" is actually true.
 	mkdir -p build/Build/Products/Debug/MDEditor.app/Contents/Helpers
-	cp -f build/Build/Products/Debug/mdedit build/Build/Products/Debug/MDEditor.app/Contents/Helpers/mdedit 2>/dev/null || true
+	cp -f build/Build/Products/Debug/mdedit build/Build/Products/Debug/MDEditor.app/Contents/Helpers/mdedit
+	# Seal the assembled local bundle after copying assets/helper. Ad-hoc builds
+	# cannot use team-based library validation for Sparkle; notarize.sh restores
+	# hardened runtime with a Developer ID signature for distribution.
+	codesign --force --sign - --options 0 --preserve-metadata=identifier,entitlements \
+	  build/Build/Products/Debug/MDEditor.app
+	codesign --verify --deep --strict build/Build/Products/Debug/MDEditor.app
 
-test: project
-	xcodebuild -project MDEditor.xcodeproj -scheme MDEditor -configuration Debug -derivedDataPath build build-for-testing
-	xcrun xctest build/Build/Products/Debug/MDEditorTests.xctest
+test: build
+	rm -rf build/unit-result.xcresult
+	xcodebuild test -project MDEditor.xcodeproj -scheme MDEditor \
+	  -configuration Debug -derivedDataPath build \
+	  -only-testing:MDEditorTests -resultBundlePath build/unit-result.xcresult
 
 ## USE-level scenarios per docs/e2e-test-plan.md.
 ## Drives the app via XCUITest + Accessibility; asserts on the DOM state
@@ -45,7 +57,7 @@ test: project
 ## NOTE one-time setup: first run pops a TCC Automation prompt for
 ## MDEditorE2ETests-Runner.app — approve once in System Settings →
 ## Privacy & Security → Automation.
-e2e: project editor-bundle
+e2e: build
 	rm -rf build/e2e-result.xcresult
 	xcodebuild build-for-testing -project MDEditor.xcodeproj -scheme MDEditor \
 	  -configuration Debug -derivedDataPath build \
@@ -60,7 +72,7 @@ e2e: project editor-bundle
 	  -configuration Debug -derivedDataPath build \
 	  -only-testing:MDEditorE2ETests \
 	  -resultBundlePath build/e2e-result.xcresult \
-	  2>&1 | tail -40 || true
+	  2>&1 | tee build/e2e.log | tail -40
 	@echo "Result bundle: build/e2e-result.xcresult"
 	@if [ -d build/e2e-result.xcresult ]; then \
 	  echo "--- summary ---"; \
@@ -91,20 +103,28 @@ dist: build
 ## Optional env: MDEDIT_TEAM_ID (defaults to LY8G872X5U — same as audire/Membrain).
 ## Prerequisite: ./scripts/setup-release.sh (one-time keychain profile + Sparkle keys).
 ## If MDEDIT_APPLE_ID is unset, skips notarization and produces an unsigned bundle.
-release: project editor-bundle
+build-release: project editor-bundle
 	xcodebuild -project MDEditor.xcodeproj -scheme MDEditor -configuration Release -derivedDataPath build build
 	xcodebuild -project MDEditor.xcodeproj -scheme mdedit -configuration Release -derivedDataPath build build
 	mkdir -p build/Build/Products/Release/MDEditor.app/Contents/Resources \
 	          build/Build/Products/Release/MDEditor.app/Contents/Helpers
 	cp -f build/editor/editor.html build/editor/editor.js build/Build/Products/Release/MDEditor.app/Contents/Resources/
 	cp -f build/Build/Products/Release/mdedit build/Build/Products/Release/MDEditor.app/Contents/Helpers/mdedit
-	@if [ -n "$$MDEDIT_APPLE_ID" ]; then \
+	# Seal the assembled local bundle after copying assets/helper. Ad-hoc builds
+	# cannot use team-based library validation for Sparkle; notarize.sh restores
+	# hardened runtime with a Developer ID signature for distribution.
+	codesign --force --sign - --options 0 --preserve-metadata=identifier,entitlements \
+	  build/Build/Products/Release/MDEditor.app
+	codesign --verify --deep --strict build/Build/Products/Release/MDEditor.app
+
+release: build-release
+	@if [ -n "$${MDEDIT_APPLE_ID:-}" ]; then \
 	    ./scripts/notarize.sh build/Build/Products/Release/MDEditor.app "$$MDEDIT_APPLE_ID" "$${MDEDIT_TEAM_ID:-LY8G872X5U}" && \
 	    ./scripts/build-dmg.sh && \
 	    ./scripts/generate-appcast.sh; \
 	  else \
 	    echo "Skipping sign/notarize: set MDEDIT_APPLE_ID=you@example.com to enable."; \
-	    ./scripts/build-dmg.sh || true; \
+	    ./scripts/build-dmg.sh; \
 	  fi
 
 clean:

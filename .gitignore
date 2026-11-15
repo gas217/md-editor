@@ -30,7 +30,6 @@ score.json
 
 # Node (CM6 bundle build, V1.0 Story 0)
 node_modules/
-package-lock.json
 dist/
 
 # Test artifacts

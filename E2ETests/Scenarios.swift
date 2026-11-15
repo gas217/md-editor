@@ -60,35 +60,83 @@ final class Scenarios: XCTestCase {
         )
     }
 
-    // MARK: Scenario 4/5 — toolbar "Comment" click without selection → no composer.
-    // Positive (with-selection) path is harder from XCUITest: WKWebView selection
-    // is opaque to AX. Negative path is the load-bearing assertion: the toolbar
-    // affordance exists AND clicking it without a selection doesn't spuriously
-    // create a composer.
-    func testCmdShiftMShowsComposer() throws {
+    // No selection must not create a composer or sidecar.
+    func testCommentWithoutSelectionDoesNothing() throws {
         let app = XCUIApplication()
-        _ = app.launchE2E(fixture: "basic.md")
-
+        let tmp = app.launchE2E(fixture: "comment-review.md")
         _ = app.waitForE2EState(
             until: { ($0.editorState["docLen"] as? Int ?? 0) > 0 },
             message: "editor mounted with content"
         )
-
         let commentButton = app.toolbars.buttons["Comment"]
-        XCTAssertTrue(commentButton.waitForExistence(timeout: 4),
-                      "toolbar Comment button missing")
+        XCTAssertTrue(commentButton.waitForExistence(timeout: 4))
         commentButton.click()
+        XCTAssertFalse(app.textViews["composerBody"].exists)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:
+            tmp.appendingPathComponent("comment-review.md.comments.json").path))
+    }
 
-        let composer = app.otherElements["composerPane"]
-        XCTAssertFalse(composer.exists,
-                       "composer should not appear without a selection")
+    func testCreateCommentAndOpenThread() throws {
+        let app = XCUIApplication()
+        let tmp = app.launchE2E(fixture: "comment-review.md")
+        _ = app.waitForE2EState(
+            until: { ($0.editorState["docLen"] as? Int ?? 0) > 0 },
+            message: "editor mounted with content"
+        )
+        let editor = app.webViews.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), app.debugDescription)
+        editor.click()
+        editor.typeKey("a", modifierFlags: .command)
+        editor.typeKey("m", modifierFlags: [.command, .shift])
+        let composer = app.textViews["composerBody"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 5), app.debugDescription)
+        // Type through the application: clicking the field would conceal a
+        // broken focus handoff that sends the user's comment into the document.
+        app.typeText("@claude clarify this #review")
+        app.typeKey(.return, modifierFlags: .command)
+        _ = app.waitForE2EState(
+            until: { ($0.editorState["commentMarkers"] as? Int ?? 0) == 1 },
+            message: "saving should immediately show one real comment marker"
+        )
+        let data = try Data(contentsOf: tmp.appendingPathComponent("comment-review.md.comments.json"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let comments = try XCTUnwrap(json["comments"] as? [[String: Any]])
+        XCTAssertEqual(comments.count, 1)
+        let comment = try XCTUnwrap(comments.first)
+        XCTAssertEqual(comment["body"] as? String, "@claude clarify this #review")
+        XCTAssertEqual(comment["addressable"] as? Bool, true)
+        let target = try XCTUnwrap(comment["target"] as? [String: Any])
+        let selectors = try XCTUnwrap(target["selectors"] as? [[String: Any]])
+        XCTAssertEqual(selectors.first(where: { $0["type"] as? String == "TextQuoteSelector" })?["exact"] as? String,
+                       "Review this sentence with the agent.\n")
+        XCTAssertNotNil(comment["id"] as? String)
+        let body = app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@ OR value CONTAINS %@",
+            "@claude clarify this #review", "@claude clarify this #review"
+        )).firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 5), "Save should reveal the new thread")
+        app.buttons["Close"].click()
+        XCTAssertFalse(body.exists)
+        let marker = app.buttons["Open comment: @claude clarify this #review"]
+        XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
+        marker.click()
+        XCTAssertTrue(body.waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["Close"].click()
+        editor.click()
+        editor.typeKey("a", modifierFlags: .command)
+        editor.typeKey("m", modifierFlags: [.command, .shift])
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        app.typeText("Cancel this draft")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(composer.exists)
+        XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md.comments.json")), data,
+                       "Escape must not persist a second comment")
+        XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md")),
+                       Data("Review this sentence with the agent.\n".utf8))
     }
 
     // MARK: Scenario 7 — reopen file with pre-existing sidecar preserves it.
-    // Plan asks for visible gutter dot too; the editor DOES wire comment markers
-    // into the gutter via commentField + commentGutter, but XCUITest can't see
-    // them through WKWebView's opaque AX. We assert the marker count via the
-    // editor probe (commentMarkers) — which IS observable.
+    // Assert both a real DOM marker and its accessible thread-opening button.
     func testReopenShowsGutterDot() throws {
         let app = XCUIApplication()
         let tmp = app.launchE2E(fixture: "basic.md")
@@ -98,6 +146,7 @@ final class Scenarios: XCTestCase {
         let sidecar = """
         {
           "version": 1,
+          "document": {"path": "basic.md", "sha256": ""},
           "comments": [{
             "id": "c_seeded000000000000000001",
             "createdAt": "2026-05-25T00:00:00Z",
@@ -133,11 +182,19 @@ final class Scenarios: XCTestCase {
         app2.launch()
 
         _ = app2.waitForE2EState(
-            until: { ($0.editorState["docLen"] as? Int ?? 0) > 0 },
-            message: "second launch loaded the doc"
+            until: { ($0.editorState["commentMarkers"] as? Int ?? 0) == 1 },
+            message: "second launch restored the saved marker"
         )
-        XCTAssertTrue(FileManager.default.fileExists(atPath: sidecarPath.path),
-                      "sidecar must survive reopen")
+        let marker = app2.buttons["Open comment: Seeded comment for reopen test."]
+        XCTAssertTrue(marker.waitForExistence(timeout: 5))
+        marker.click()
+        let body = app2.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@ OR value CONTAINS %@",
+            "Seeded comment for reopen test.", "Seeded comment for reopen test."
+        )).firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 5), app2.debugDescription)
+        XCTAssertEqual(try String(contentsOf: sidecarPath, encoding: .utf8), sidecar,
+                       "viewing a thread must not rewrite its sidecar")
     }
 
     // MARK: Scenario 9 — open .csv → preview pane renders an HTML table.
@@ -147,8 +204,8 @@ final class Scenarios: XCTestCase {
 
         let state = app.waitForE2EState(
             timeout: 10,
-            until: { ($0.previewState["tableRows"] as? Int ?? 0) >= 1 },
-            message: "csv preview should render an HTML table with rows"
+            until: { ($0.previewState["tableRows"] as? Int ?? 0) >= 4 },
+            message: "csv preview should finish rendering the header and three rows"
         )
         // basic.csv has 1 header row + 3 data rows = 4 <tr> elements.
         XCTAssertGreaterThanOrEqual(state.previewState["tableRows"] as? Int ?? 0, 4,
@@ -185,8 +242,8 @@ final class Scenarios: XCTestCase {
 
         let state = app.waitForE2EState(
             timeout: 10,
-            until: { ($0.previewState["htmlBodyChildren"] as? Int ?? 0) >= 1 },
-            message: "html preview should render body children"
+            until: { ($0.previewState["htmlBodyChildren"] as? Int ?? 0) >= 3 },
+            message: "html preview should finish rendering the heading, paragraph, and list"
         )
         // basic.html has h1 + p + ul = 3 children
         XCTAssertGreaterThanOrEqual(state.previewState["htmlBodyChildren"] as? Int ?? 0, 3,
@@ -225,6 +282,7 @@ final class Scenarios: XCTestCase {
         let sidecar = """
         {
           "version": 1,
+          "document": {"path": "basic.md", "sha256": ""},
           "comments": [{
             "id": "c_agentedit0000000000000001",
             "createdAt": "2026-05-25T00:00:00Z",

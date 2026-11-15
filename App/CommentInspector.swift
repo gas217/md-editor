@@ -52,7 +52,8 @@ final class CommentInspectorModel: ObservableObject {
             guard let self,
                   let info = note.userInfo,
                   let id = info["id"] as? String,
-                  let url = document.fileURL else { return }
+                  let url = info["documentURL"] as? URL,
+                  url == self.document.fileURL else { return }
             self.composer = nil
             do {
                 let sidecar = try CommentStore.load(for: url)
@@ -83,11 +84,7 @@ final class CommentInspectorModel: ObservableObject {
 }
 
 struct CommentInspectorContainer: View {
-    @StateObject private var model: CommentInspectorModel
-
-    init(document: MDDocument) {
-        _model = StateObject(wrappedValue: CommentInspectorModel(document: document))
-    }
+    @ObservedObject var model: CommentInspectorModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -227,7 +224,6 @@ struct ComposerView: View {
             }
         }
         .padding(14)
-        .accessibilityIdentifier("composerPane")
         .onAppear { focused = true }
     }
 
@@ -246,6 +242,8 @@ struct ComposerView: View {
             try CommentStore.addComment(comment, to: context.documentURL)
             NotificationCenter.default.post(name: .mdeditCommentsChanged, object: nil)
             onDismiss()
+            NotificationCenter.default.post(name: .mdeditCommentClicked, object: nil,
+                                            userInfo: ["id": comment.id, "documentURL": context.documentURL])
         } catch {
             NSLog("[mdedit.inspector] addComment failed: \(error)")
         }
@@ -260,8 +258,14 @@ struct ThreadView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
+                Label(comment.resolved ? "Resolved" : "Open", systemImage: comment.resolved ? "checkmark.circle" : "bubble.left")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(comment.author.name)
+                    .font(.caption.weight(.semibold))
                 Text(comment.body)
                     .font(.body)
+                    .textSelection(.enabled)
                 ForEach(comment.thread.indices, id: \.self) { idx in
                     let reply = comment.thread[idx]
                     VStack(alignment: .leading, spacing: 4) {

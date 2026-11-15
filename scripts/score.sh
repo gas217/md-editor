@@ -29,8 +29,8 @@ scaffold_score() {
     "Tests"
     "project.yml"
     "Makefile"
-    "../preview-md-shared/Package.swift"
-    "../preview-md-shared/Sources/Shared"
+    "Vendor/preview-md-shared/Package.swift"
+    "Vendor/preview-md-shared/Sources/Shared"
   )
   local present=0
   for path in "${expected[@]}"; do
@@ -109,8 +109,8 @@ verification_score() {
 }
 
 # 6. Build harness — does `make build` actually succeed?
-# No caching — adversarial review correctly noted that caching grants stale 100s.
-# CI handles the cost; local devs can use FAST_SCORE=1 to skip the build check.
+# Run the actual build; existing artifacts are not evidence for this checkout.
+# Local devs can use FAST_SCORE=1 to skip it, with zero build credit.
 build_score() {
   if [[ ! -f Makefile ]] || [[ ! -f project.yml ]]; then
     echo 0
@@ -119,34 +119,22 @@ build_score() {
 
   if [[ -n "${FAST_SCORE:-}" ]]; then
     # Explicit opt-out for local hot-loops; never used by CI.
-    echo "SKIP"  # surface in output so user sees they skipped
+    echo "Build check skipped (FAST_SCORE); assigning 0, readiness gate cannot pass." >&2
+    echo 0
     return
   fi
 
   if ! command -v xcodegen >/dev/null; then
-    # Toolchain missing — half credit, can't blame the repo.
-    echo 50
+    echo 0
     return
   fi
 
-  # Run a project-generation check (cheap, <2s) — actual xcodebuild is expensive
-  # and gates on the toolchain. CI runs the full `make build` in a separate job
-  # (.github/workflows/ci.yml) so a broken build can't silently score 100.
-  if make project >/tmp/mdedit-project.log 2>&1; then
-    if [[ -f MDEditor.xcodeproj/project.pbxproj ]]; then
-      # Did `make build` produce a runnable .app + dist bundle + the helper binary?
-      # If yes, the full pipeline is empirically working — score 100.
-      if [[ -d build/Build/Products/Debug/MDEditor.app/Contents/MacOS ]] \
-         && [[ -x build/Build/Products/Debug/MDEditor.app/Contents/Helpers/mdedit ]]; then
-        echo 100
-      else
-        echo 90  # project generates; full build not yet verified
-      fi
-    else
-      echo 60
-    fi
+  mkdir -p build
+  if make build >build/score-build.log 2>&1; then
+    echo 100
   else
-    echo 30
+    echo "Build failed; see build/score-build.log." >&2
+    echo 0
   fi
 }
 

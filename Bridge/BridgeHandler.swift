@@ -18,9 +18,18 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
     /// this guard, ready→doc.load→ready becomes a tight CPU loop pinning the
     /// main thread at 50–60 %.
     private var didSendInitialLoad = false
+    private var commentsObserver: NSObjectProtocol?
 
     init(document: MDDocument) {
         self.document = document
+        super.init()
+        commentsObserver = NotificationCenter.default.addObserver(
+            forName: .mdeditCommentsChanged, object: nil, queue: .main
+        ) { [weak self] _ in self?.sendComments() }
+    }
+
+    deinit {
+        if let commentsObserver { NotificationCenter.default.removeObserver(commentsObserver) }
     }
 
     func attach(to webView: WKWebView) {
@@ -103,13 +112,12 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
     }
 
     private func handleCommentClicked(_ payload: Any?) {
-        // V1.0: scroll the comments overlay (right inspector pane) to the thread.
-        // UI overlay wiring lands in V1.0 Story 4 final UI pass.
-        guard let p = payload as? [String: Any], let id = p["id"] as? String else { return }
+        guard let url = document?.fileURL,
+              let p = payload as? [String: Any], let id = p["id"] as? String else { return }
         NotificationCenter.default.post(
             name: .mdeditCommentClicked,
             object: nil,
-            userInfo: ["id": id]
+            userInfo: ["id": id, "documentURL": url]
         )
     }
 
@@ -155,6 +163,21 @@ final class BridgeHandler: NSObject, WKScriptMessageHandler {
             "language": document.format.bridgeLanguage,
             "readOnly": false,
         ])
+        sendComments()
+    }
+
+    private func sendComments() {
+        guard didSendInitialLoad, let document, let url = document.fileURL else { return }
+        do {
+            let sidecar = try CommentStore.load(for: url)
+            send(type: "comments.set", payload: [
+                "comments": CommentPresentation.markers(in: sidecar, text: document.text)
+            ])
+        } catch {
+            // A malformed sidecar must not leave stale markers pointing at old threads.
+            send(type: "comments.set", payload: ["comments": []])
+            NSLog("[mdedit.bridge] Could not load comment markers: %@", error.localizedDescription)
+        }
     }
 
     private func handleReply(id: String, payload: Any?) {
