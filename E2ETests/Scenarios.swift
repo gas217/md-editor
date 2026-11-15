@@ -60,28 +60,63 @@ final class Scenarios: XCTestCase {
         )
     }
 
-    // MARK: Scenario 4/5 — toolbar "Comment" click without selection → no composer.
-    // Positive (with-selection) path is harder from XCUITest: WKWebView selection
-    // is opaque to AX. Negative path is the load-bearing assertion: the toolbar
-    // affordance exists AND clicking it without a selection doesn't spuriously
-    // create a composer.
-    func testCmdShiftMShowsComposer() throws {
+    // No selection must not create a composer or sidecar.
+    func testCommentWithoutSelectionDoesNothing() throws {
         let app = XCUIApplication()
-        _ = app.launchE2E(fixture: "basic.md")
-
+        let tmp = app.launchE2E(fixture: "comment-review.md")
         _ = app.waitForE2EState(
             until: { ($0.editorState["docLen"] as? Int ?? 0) > 0 },
             message: "editor mounted with content"
         )
-
         let commentButton = app.toolbars.buttons["Comment"]
-        XCTAssertTrue(commentButton.waitForExistence(timeout: 4),
-                      "toolbar Comment button missing")
+        XCTAssertTrue(commentButton.waitForExistence(timeout: 4))
         commentButton.click()
+        XCTAssertFalse(app.textViews["composerBody"].exists)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:
+            tmp.appendingPathComponent("comment-review.md.comments.json").path))
+    }
 
-        let composer = app.otherElements["composerPane"]
-        XCTAssertFalse(composer.exists,
-                       "composer should not appear without a selection")
+    func testCreateCommentAndOpenThread() throws {
+        let app = XCUIApplication()
+        let tmp = app.launchE2E(fixture: "comment-review.md")
+        _ = app.waitForE2EState(
+            until: { ($0.editorState["docLen"] as? Int ?? 0) > 0 },
+            message: "editor mounted with content"
+        )
+        let editor = app.webViews.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), app.debugDescription)
+        editor.click()
+        editor.typeKey("a", modifierFlags: .command)
+        editor.typeKey("m", modifierFlags: [.command, .shift])
+        let composer = app.textViews["composerBody"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 5), app.debugDescription)
+        composer.click()
+        composer.typeText("@claude clarify this #review")
+        composer.typeKey(.return, modifierFlags: .command)
+        _ = app.waitForE2EState(
+            until: { ($0.editorState["commentMarkers"] as? Int ?? 0) == 1 },
+            message: "saving should immediately show one real comment marker"
+        )
+        let data = try Data(contentsOf: tmp.appendingPathComponent("comment-review.md.comments.json"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let comments = try XCTUnwrap(json["comments"] as? [[String: Any]])
+        XCTAssertEqual(comments.count, 1)
+        let comment = try XCTUnwrap(comments.first)
+        XCTAssertEqual(comment["body"] as? String, "@claude clarify this #review")
+        XCTAssertEqual(comment["addressable"] as? Bool, true)
+        let target = try XCTUnwrap(comment["target"] as? [String: Any])
+        let selectors = try XCTUnwrap(target["selectors"] as? [[String: Any]])
+        XCTAssertEqual(selectors.first(where: { $0["type"] as? String == "TextQuoteSelector" })?["exact"] as? String,
+                       "Review this sentence with the agent.\n")
+        let id = try XCTUnwrap(comment["id"] as? String)
+        let marker = app.buttons["Open open comment \(id)"]
+        XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
+        marker.click()
+        let body = app.staticTexts["threadBody"]
+        XCTAssertTrue(body.waitForExistence(timeout: 5))
+        XCTAssertEqual(body.value as? String, "@claude clarify this #review")
+        XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md")),
+                       Data("Review this sentence with the agent.\n".utf8))
     }
 
     // MARK: Scenario 7 — reopen file with pre-existing sidecar preserves it.
@@ -98,6 +133,7 @@ final class Scenarios: XCTestCase {
         let sidecar = """
         {
           "version": 1,
+          "document": {"path": "basic.md", "sha256": ""},
           "comments": [{
             "id": "c_seeded000000000000000001",
             "createdAt": "2026-05-25T00:00:00Z",
@@ -133,11 +169,17 @@ final class Scenarios: XCTestCase {
         app2.launch()
 
         _ = app2.waitForE2EState(
-            until: { ($0.editorState["docLen"] as? Int ?? 0) > 0 },
-            message: "second launch loaded the doc"
+            until: { ($0.editorState["commentMarkers"] as? Int ?? 0) == 1 },
+            message: "second launch restored the saved marker"
         )
-        XCTAssertTrue(FileManager.default.fileExists(atPath: sidecarPath.path),
-                      "sidecar must survive reopen")
+        let marker = app2.buttons["Open open comment c_seeded000000000000000001"]
+        XCTAssertTrue(marker.waitForExistence(timeout: 5))
+        marker.click()
+        let body = app2.staticTexts["threadBody"]
+        XCTAssertTrue(body.waitForExistence(timeout: 5))
+        XCTAssertEqual(body.value as? String, "Seeded comment for reopen test.")
+        XCTAssertEqual(try String(contentsOf: sidecarPath, encoding: .utf8), sidecar,
+                       "viewing a thread must not rewrite its sidecar")
     }
 
     // MARK: Scenario 9 — open .csv → preview pane renders an HTML table.
@@ -225,6 +267,7 @@ final class Scenarios: XCTestCase {
         let sidecar = """
         {
           "version": 1,
+          "document": {"path": "basic.md", "sha256": ""},
           "comments": [{
             "id": "c_agentedit0000000000000001",
             "createdAt": "2026-05-25T00:00:00Z",

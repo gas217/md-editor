@@ -1,102 +1,74 @@
-# E2E test plan
+# E2E test plan and current coverage
 
-Why this exists: the user has caught three USE-level bugs in a row that the
-existing test suite (78 unit tests, all green) reported nothing about — file
-opens but renders raw markdown, ⌘⇧M opens inspector but composer never
-appears, etc. "Builds & file exists" ≠ "works for a user."
+The XCUITest target exists and contains 10 test methods. `make e2e` builds
+the app, bundles its editor assets and CLI, then runs the UI tests. Build,
+signing, and test failures propagate to the command and CI. Results are
+written to `build/e2e-result.xcresult`.
 
-This plan defines a USE-level test layer that catches those bugs before the
-user sees them.
+The 13 rows below are the acceptance plan, not a claim of 13 completed
+scenarios. Source audit: 2026-11-08. A test method's name alone is not
+evidence that its full planned behavior is asserted.
 
-## Test pyramid (after this lands)
+## Latest local run
 
-```
-Layer          | What it tests                          | Tooling
----------------+----------------------------------------+------------------
-e2e (NEW)      | USE scenarios — open, render, save,    | XCUITest + JS
-               | comment, reopen, agent reply           | bridge assertions
-integration    | Swift package APIs + sidecars + bridge | XCTest (existing)
-unit (78×)     | TextCanon, AnchorResolver, CSV parse,  | XCTest (existing)
-               | comment serialisation                  |
-```
+On 2026-11-09 with Xcode 26.4.1, 9 of 10 tests passed.
+`testCmdShiftMShowsComposer` failed while waiting for `e2e-state` to appear;
+the result bundle is `build/e2e-result.xcresult`. `make e2e` returned a failing
+status. The remaining assertion gaps below exist independently of this failure.
 
-Today: only the bottom two exist. Adding e2e fills the gap that has been
-allowed to bite.
+## Coverage
 
-## Scenarios to cover (V1.0)
+| # | Planned behavior | Current automated assertion / gap |
+|---|---|---|
+| 1 | Open .md from Finder; editor is ready with content | `testOpensMdFile` opens via test launch arguments and checks the window title. Finder routing and editor readiness are not checked by this method. |
+| 2 | Markdown renders with appropriately sized headings | `testMarkdownActuallyRenders` checks h1/h2 and inline-code DOM classes. Computed heading sizes are not checked. |
+| 3 | Gutter has no white strip | `testGutterHasNoWhiteStrip` checks the computed background is transparent. |
+| 4 | Comment command without selection does not open composer | `testCmdShiftMShowsComposer` actually clicks the toolbar button without a selection and checks composer absence. The keyboard shortcut and sidecar absence are not checked. |
+| 5 | Select text + comment command opens composer with quote | Not implemented. |
+| 6 | Enter comment + save writes a valid sidecar | Not implemented. |
+| 7 | Quit/reopen restores a comment's gutter dot | `testReopenShowsGutterDot` checks document content loads and a seeded sidecar survives. It does not assert marker restoration or successful sidecar decoding. |
+| 8 | Click gutter dot reveals the matching thread | Not implemented. |
+| 9 | CSV opens with table preview | `testOpensCsvPreview` checks at least four HTML table rows and two web views. The preview uses WKWebView, not NSTableView. |
+| 10 | JSON opens with a tree preview | `testOpensJsonPreview` accepts JSON keys or any body content, plus two web views. Tree structure and expand/collapse behavior remain unverified. |
+| 11 | HTML opens with rendered body content | `testOpensHtmlPreview` checks at least three body children and two web views. |
+| 12 | PDF opens with a loaded document | `testOpensPdfShowsPDFView` checks PDFView presence only; it does not check that the document loaded. |
+| 13 | External agent sidecar edit refreshes inspector within 1s | `testAgentEditRefreshesSidecar` writes and reads JSON in the test process. It does not observe an app refresh; a file watcher and observable inspector assertions remain open. |
 
-Each scenario is one XCUITest test method. Each must FAIL today on a broken
-build and PASS only when the user-visible behaviour works.
+## Existing test hooks
 
-| # | Scenario | Pass condition |
-|---|----------|----------------|
-| 1 | `open .md from Finder` → window appears | window.title contains filename; bridge replied editor.ready; JS doc.toString() length > 0 |
-| 2 | `open .md` → markdown actually renders | JS `document.querySelector('.cm-h1')` matches at least one element AND its computed fontSize > 1.5em |
-| 3 | `open .md` → gutter has no white strip | JS `getComputedStyle(document.querySelector('.cm-gutters')).backgroundColor` is `rgba(0,0,0,0)` or transparent |
-| 4 | `⌘⇧M without selection` → no composer | inspector stays collapsed; sidecar JSON not created |
-| 5 | `select text + ⌘⇧M` → composer shows | inspector pane width > 0; "On: …selected text…" label visible |
-| 6 | `type comment + ⌘↩` → sidecar written | `<file>.md.comments.json` exists; contains 1 comment with body |
-| 7 | `quit + reopen file` → gutter shows comment dot | JS `.cm-comment-active` element exists in gutter |
-| 8 | `click gutter dot` → ThreadView shows in inspector | inspector visible; body text matches saved comment |
-| 9 | `open .csv` → preview pane shows table | NSTableView with >0 rows visible on right pane |
-| 10 | `open .json` → preview pane shows tree | DisclosureGroup or similar visible on right pane |
-| 11 | `open .html` → preview pane shows rendered | WKWebView on right pane has document.body.children.length > 0 |
-| 12 | `open .pdf` → PDFKit shows document | PDFView present, hasDocument == true |
-| 13 | `agent edits sidecar externally` → inspector refreshes | write sidecar from test process; inspector ThreadView updates within 1s |
+`App/E2EBridge.swift` activates only with `--e2e=1` or `MDEDIT_E2E=1`.
+It opens `--e2e-fixture=<path>`, uses `--e2e-tmp=<path>` for test sidecars,
+and polls DOM state into an Accessibility field named `e2e-state`.
+`E2ETests/E2EHelpers.swift` stages fixtures in a fresh temporary directory
+and decodes that field. The hook exposes predefined probes, not an
+arbitrary-JavaScript message handler.
 
-## What needs to ship in the app to make these testable
+Current signals include editor heading/code counts, text length, gutter
+background, comment-marker count, preview table/key/body counts, PDFView
+presence, and web-view count. Full composer, inspector, computed heading
+style, and PDF document state need additional observable signals.
 
-XCUITest drives the app via Accessibility. WKWebView's DOM is opaque to it,
-so we need bridge hooks:
+## Running and extending
 
-1. **Launch-arg test mode**: `--e2e=1` enables a test-only message handler
-   `webkit.messageHandlers.test` that lets XCUITest evaluate arbitrary JS
-   in the editor and read the result. This is the standard MarkEdit /
-   VS Code pattern.
+Run `make e2e` from an interactive macOS session with Xcode installed.
+macOS may request Automation or Accessibility access for the test runner.
+A build-for-testing pass verifies compilation only; inspect the test
+execution result before reporting the suite as passing. CI uploads the
+result bundle on failure when one exists.
 
-2. **Deterministic temp dir**: `--e2e-tmp=<path>` forces the doc dir + sidecar
-   dir to a temp location the test owns. Prevents tests from polluting the
-   user's real docs.
+Prioritize the missing comment workflow (5, 6, 8), then strengthen 7 and
+13 so they observe the app consuming valid sidecars. Add any required AX
+identifiers/probes, fixtures under `E2ETests/Fixtures/`, and update this
+table in the same change.
 
-3. **AX identifiers** on the toolbar buttons, inspector pane, composer fields
-   (`addCommentButton`, `inspectorPane`, `composerBody`, `composerSave`) so
-   XCUITest can grab them by name not by index.
+The unit suite still has explicitly skipped acceptance placeholders.
+`scripts/score.sh` awards verification points for E2E scaffolding; it does
+not execute the suite or certify these acceptance rows. CI invokes
+`make e2e` separately.
 
-4. **Test-only entry point in CommentInspectorModel** to read the current
-   `composer` / `activeThread` state from outside (a debug `currentState()`
-   that test mode wires to the test bridge).
+## Outside this suite
 
-None of these affect production behaviour — gated on `--e2e=1`.
-
-## Test targets
-
-- Add `MDEditorE2ETests` target (XCUITest bundle) to `project.yml`.
-- Add `make e2e` → `xcodebuild test -scheme MDEditor -only-testing:MDEditorE2ETests`.
-- Add `make e2e-CI` → same plus `-resultBundlePath` for CI artifacts.
-- Wire into existing `scripts/score.sh` so the verification dimension
-  (currently file-existence + build success) actually requires e2e green.
-
-## What this will NOT do
-
-- Test PreviewMD's QuickLook extension (separate repo).
-- Test Sparkle update flow (would require a fake appcast server).
-- Test macOS Writing Tools / Apple Intelligence (no public test API).
-- Validate visual rendering pixel-perfect against PreviewMD (instead we
-  assert on DOM properties + computed styles).
-
-## Effort estimate
-
-- Project scaffolding + AX identifiers: ~1 day
-- Scenarios 1–8: ~2 days
-- Scenarios 9–13: ~1 day
-- CI hook + score.sh wiring: ~0.5 day
-- **Total**: ~1 week of focused work
-
-## Open questions for the user
-
-1. Build this now in V1.0 or defer to V1.1? V1.0 ships sooner without it,
-   but the past 24 hours show the cost: 3 user-caught USE bugs.
-2. Should we also add a Playwright/Detox-style JS test for the CM6 bundle
-   in isolation? Faster feedback loop, but doesn't cover the Swift⇄JS path.
-3. CI runner: GitHub Actions macOS runners support XCUITest but are slow
-   (~8 min per scenario). Acceptable, or self-hosted?
+- Preview MD's Quick Look extension (separate repo).
+- Sparkle update delivery.
+- macOS Writing Tools / Apple Intelligence.
+- Pixel-perfect visual comparison against Preview MD.

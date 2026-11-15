@@ -272,12 +272,18 @@ final class DocumentSplitViewController: NSViewController {
         observers.append(
             NotificationCenter.default.addObserver(
                 forName: .mdeditCommentRequested, object: nil, queue: .main
-            ) { [weak self] _ in self?.revealInspector() }
+            ) { [weak self] note in
+                guard let self, note.userInfo?["documentURL"] as? URL == self.document.fileURL else { return }
+                self.revealInspector()
+            }
         )
         observers.append(
             NotificationCenter.default.addObserver(
                 forName: .mdeditCommentClicked, object: nil, queue: .main
-            ) { [weak self] _ in self?.revealInspector() }
+            ) { [weak self] note in
+                guard let self, note.userInfo?["documentURL"] as? URL == self.document.fileURL else { return }
+                self.revealInspector()
+            }
         )
         observers.append(
             NotificationCenter.default.addObserver(

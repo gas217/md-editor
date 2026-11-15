@@ -65,33 +65,53 @@ const commentField = StateField.define<CommentMarker[]>({
         for (const e of tr.effects) {
             if (e.is(setComments)) return e.value;
         }
+        if (tr.docChanged) {
+            return value.map(c => ({ ...c,
+                from: tr.changes.mapPos(c.from, 1),
+                to: tr.changes.mapPos(c.to, -1),
+            })).filter(c => c.to > c.from);
+        }
         return value;
     },
 });
 
-// Gutter marker: filled dot for active, ring for orphaned, check for resolved.
+// One accessible button per thread, including multiple comments on one line.
 class CommentGutterMarker extends GutterMarker {
-    constructor(private readonly status: CommentMarker["status"]) { super(); }
+    constructor(private readonly comments: CommentMarker[]) { super(); }
+    eq(other: CommentGutterMarker) {
+        return JSON.stringify(this.comments) === JSON.stringify(other.comments);
+    }
     toDOM() {
-        const el = document.createElement("span");
-        el.className = `cm-comment-marker cm-comment-${this.status}`;
-        el.textContent = this.status === "resolved" ? "✓" : this.status === "orphaned" ? "○" : "●";
-        return el;
+        const group = document.createElement("span");
+        for (const comment of this.comments) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `cm-comment-marker cm-comment-${comment.status}`;
+            button.dataset.commentId = comment.id;
+            const status = comment.status === "resolved" ? "resolved" : "open";
+            button.setAttribute("aria-label", `Open ${status} comment ${comment.id}`);
+            button.title = `Open ${status} comment`;
+            button.textContent = comment.status === "resolved" ? "✓" : comment.status === "orphaned" ? "○" : "●";
+            button.addEventListener("click", event => {
+                event.preventDefault();
+                event.stopPropagation();
+                send("comment.clicked", { id: comment.id }, 0);
+            });
+            group.appendChild(button);
+        }
+        return group;
     }
 }
 
 const commentGutter = gutter({
     class: "cm-comments-gutter",
     lineMarker(view, line) {
-        const comments = view.state.field(commentField, false) ?? [];
-        for (const c of comments) {
-            if (c.from <= line.from && line.from <= c.to) {
-                return new CommentGutterMarker(c.status);
-            }
-        }
-        return null;
+        const comments = (view.state.field(commentField, false) ?? [])
+            .filter(c => c.from >= line.from && c.from <= view.state.doc.lineAt(line.from).to);
+        return comments.length ? new CommentGutterMarker(comments) : null;
     },
-    initialSpacer: () => new CommentGutterMarker("active"),
+    lineMarkerChange: update => update.docChanged ||
+        update.state.field(commentField) !== update.startState.field(commentField),
 });
 
 const commentHighlight = ViewPlugin.fromClass(class {
@@ -108,7 +128,7 @@ const commentHighlight = ViewPlugin.fromClass(class {
     private buildDecorations(view: EditorView): DecorationSet {
         const b = new RangeSetBuilder<Decoration>();
         const comments = view.state.field(commentField, false) ?? [];
-        for (const c of comments) {
+        for (const c of [...comments].sort((a, b) => a.from - b.from || a.to - b.to)) {
             if (c.status === "active" || c.status === "orphaned") {
                 const from = Math.max(0, Math.min(c.from, view.state.doc.length));
                 const to = Math.max(from, Math.min(c.to, view.state.doc.length));
@@ -167,8 +187,14 @@ const surfaceTheme = EditorView.theme({
 const commentTheme = EditorView.baseTheme({
     ".cm-comment-mark.cm-comment-active": { backgroundColor: "rgba(255, 213, 79, 0.28)" },
     ".cm-comment-mark.cm-comment-orphaned": { backgroundColor: "rgba(255, 138, 128, 0.28)" },
-    ".cm-comments-gutter": { width: "1.4em", textAlign: "center" },
-    ".cm-comment-marker": { cursor: "pointer", fontSize: "0.9em" },
+    ".cm-comments-gutter": { minWidth: "24px", textAlign: "center" },
+    ".cm-comment-marker": {
+        cursor: "pointer", fontSize: "12px", fontFamily: "inherit",
+        background: "transparent", border: "none", borderRadius: "4px",
+        minWidth: "24px", minHeight: "24px", padding: "2px 4px",
+    },
+    ".cm-comment-marker:hover": { backgroundColor: "rgba(127,127,127,0.18)" },
+    ".cm-comment-marker:focus-visible": { outline: "2px solid currentColor", outlineOffset: "-2px" },
     ".cm-comment-active": { color: "#f9a825" },
     ".cm-comment-orphaned": { color: "#e57373" },
     ".cm-comment-resolved": { color: "#66bb6a" },

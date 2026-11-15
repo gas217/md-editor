@@ -33,6 +33,14 @@ enum TextCanon {
         s.utf16.count
     }
 
+    /// Safely check a CodeMirror range against the original, unnormalized text.
+    static func substring(_ source: String, from: Int, to: Int) -> String? {
+        guard from >= 0, to > from, to <= utf16Length(source),
+              let range = Range(NSRange(location: from, length: to - from), in: source)
+        else { return nil }
+        return String(source[range])
+    }
+
     /// SHA-256 of the LF-normalized UTF-8 bytes.
     /// Stable across machines that flip line endings.
     static func documentHash(_ source: String) -> String {

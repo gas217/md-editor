@@ -52,7 +52,8 @@ final class CommentInspectorModel: ObservableObject {
             guard let self,
                   let info = note.userInfo,
                   let id = info["id"] as? String,
-                  let url = document.fileURL else { return }
+                  let url = info["documentURL"] as? URL,
+                  url == self.document.fileURL else { return }
             self.composer = nil
             do {
                 let sidecar = try CommentStore.load(for: url)
@@ -260,8 +261,15 @@ struct ThreadView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
+                Label(comment.resolved ? "Resolved" : "Open", systemImage: comment.resolved ? "checkmark.circle" : "bubble.left")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(comment.author.name)
+                    .font(.caption.weight(.semibold))
                 Text(comment.body)
                     .font(.body)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("threadBody")
                 ForEach(comment.thread.indices, id: \.self) { idx in
                     let reply = comment.thread[idx]
                     VStack(alignment: .leading, spacing: 4) {
@@ -277,6 +285,7 @@ struct ThreadView: View {
             }
             .padding(14)
         }
+        .accessibilityIdentifier("commentThread")
     }
 }
 

@@ -22,7 +22,7 @@ settings:
 
 packages:
   preview-md-shared:
-    path: ../preview-md-shared
+    path: Vendor/preview-md-shared
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"

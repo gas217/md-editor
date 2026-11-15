@@ -5,8 +5,7 @@
   "description": "CodeMirror 6 editor bundle for MD Editor. Built by esbuild; loaded by Editor/EditorHostViewController.swift into WKWebView. See VISION.md Appendix A for the bridge protocol this implements.",
   "scripts": {
     "build": "esbuild src/editor.ts --bundle --minify --format=iife --target=safari17 --outfile=../../build/editor/editor.js",
-    "dev": "esbuild src/editor.ts --bundle --format=iife --target=safari17 --outfile=../../build/editor/editor.js --watch",
-    "ime-corpus": "node scripts/run-ime-corpus.mjs"
+    "dev": "esbuild src/editor.ts --bundle --format=iife --target=safari17 --outfile=../../build/editor/editor.js --watch"
   },
   "devDependencies": {
     "esbuild": "0.21.5",

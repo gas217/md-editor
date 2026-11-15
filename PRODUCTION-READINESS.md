@@ -1,5 +1,10 @@
 # Production Readiness Checklist
 
+Repository reconciliation (2026-11-09): Debug/Release builds and the unit suite pass
+(78 passed, 18 skipped); the E2E run has 9 passing tests and 1 failure. The
+historical checklist evidence below was not comprehensively revalidated.
+See `README.md` and `docs/e2e-test-plan.md` for current verification limits.
+
 The bar that separates "buildable spec" from "shippable software." Each item is either checked `[x]` with **evidence** (a file path, CI job name, or commit ref in parentheses) or unchecked `[ ]`. `scripts/score.sh` parses this file and computes dimension 12 of the metrics rubric.
 
 A checked item without evidence is a lie and fails review.
@@ -66,7 +71,7 @@ Status legend:
 - [x] Accessibility test scaffolded (evidence: `Tests/Accessibility.swift`)
 - [ ] Initial VoiceOver pass completed on a built binary (requires V1.0 build to exist)
 - [x] All current UI controls have accessibility labels (evidence: `App/WelcomeWindow.swift` Open File / New Document / recent-files all have `accessibilityLabel` + `accessibilityHint`; `Sidebar/SidebarView.swift` file rows have label + hint + isButton trait. Editor surface inherits CM6's built-in a11y; status bar uses `NSTextField(labelWithString:)` which is automatically labeled. Further coverage tracks story implementation.)
-- [x] WCAG AA contrast meets baseline in renderer CSS (evidence: `preview-md-shared/Sources/Shared/HTMLTemplate.swift` baseCSS uses `#0366d6` link on white (7.4:1), `#69b7ff` link on `#1e1e1e` (6.2:1), text colors #1e1e1e/#d4d4d4 (both > 12:1) — all exceed WCAG AA 4.5:1. Custom theme work pending in V1.1+.)
+- [x] WCAG AA contrast meets baseline in renderer CSS (evidence: `Vendor/preview-md-shared/Sources/Shared/HTMLTemplate.swift` baseCSS uses `#0366d6` link on white (7.4:1), `#69b7ff` link on `#1e1e1e` (6.2:1), text colors #1e1e1e/#d4d4d4 (both > 12:1) — all exceed WCAG AA 4.5:1. Custom theme work pending in V1.1+.)
 - [ ] Keyboard-only V1.0 acceptance verified (requires built app)
 - [x] Reduce-motion preference honored (no app-level animations exist today — vacuously true; tracked here so when any animations are added, the @Environment(\.accessibilityReduceMotion) check lands with them)
 

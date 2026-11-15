@@ -29,7 +29,7 @@ This is the maintainer's release runbook. Public users don't need this.
 ### Per-release steps
 
 1. **Dogfood gate.** Run `scripts/dogfood-report.sh` — must show ≥30 qualifying days for V1.0/V1.1; no dogfood requirement for V0.x patch releases.
-2. **CI green.** Last 7 days of CI pushes on `main` must all be green. `scripts/score.sh` must report `gate_met: true`.
+2. **CI green.** Last 7 days of CI pushes on `master` must all be green. `scripts/score.sh` must report `gate_met: true`.
 3. **Update `CHANGELOG.md`.** Move the `[Unreleased]` section under the new version heading; add today's date; create a new empty `[Unreleased]` block.
 4. **Bump version.** Update `CFBundleShortVersionString` in `project.yml`. Commit: `release: bump to vX.Y.Z`.
 5. **Tag.** `git tag -s vX.Y.Z -m "Release vX.Y.Z"` (signed tag).
