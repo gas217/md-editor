@@ -264,10 +264,6 @@ struct ThreadView: View {
                 Text(comment.body)
                     .font(.body)
                     .textSelection(.enabled)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(comment.body)
-                    .accessibilityAddTraits(.isStaticText)
-                    .accessibilityIdentifier("threadBody")
                 ForEach(comment.thread.indices, id: \.self) { idx in
                     let reply = comment.thread[idx]
                     VStack(alignment: .leading, spacing: 4) {

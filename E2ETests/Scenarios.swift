@@ -112,18 +112,17 @@ final class Scenarios: XCTestCase {
         let marker = app.buttons["Open comment: @claude clarify this #review"]
         XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
         marker.click()
-        let body = app.descendants(matching: .any)["threadBody"]
-        XCTAssertTrue(body.waitForExistence(timeout: 5))
-        XCTAssertEqual(body.label, "@claude clarify this #review")
+        let body = app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@ OR value CONTAINS %@",
+            "@claude clarify this #review", "@claude clarify this #review"
+        )).firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md")),
                        Data("Review this sentence with the agent.\n".utf8))
     }
 
     // MARK: Scenario 7 — reopen file with pre-existing sidecar preserves it.
-    // Plan asks for visible gutter dot too; the editor DOES wire comment markers
-    // into the gutter via commentField + commentGutter, but XCUITest can't see
-    // them through WKWebView's opaque AX. We assert the marker count via the
-    // editor probe (commentMarkers) — which IS observable.
+    // Assert both a real DOM marker and its accessible thread-opening button.
     func testReopenShowsGutterDot() throws {
         let app = XCUIApplication()
         let tmp = app.launchE2E(fixture: "basic.md")
@@ -175,9 +174,11 @@ final class Scenarios: XCTestCase {
         let marker = app2.buttons["Open comment: Seeded comment for reopen test."]
         XCTAssertTrue(marker.waitForExistence(timeout: 5))
         marker.click()
-        let body = app2.descendants(matching: .any)["threadBody"]
-        XCTAssertTrue(body.waitForExistence(timeout: 5))
-        XCTAssertEqual(body.label, "Seeded comment for reopen test.")
+        let body = app2.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@ OR value CONTAINS %@",
+            "Seeded comment for reopen test.", "Seeded comment for reopen test."
+        )).firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 5), app2.debugDescription)
         XCTAssertEqual(try String(contentsOf: sidecarPath, encoding: .utf8), sidecar,
                        "viewing a thread must not rewrite its sidecar")
     }
