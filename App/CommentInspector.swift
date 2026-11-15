@@ -84,11 +84,7 @@ final class CommentInspectorModel: ObservableObject {
 }
 
 struct CommentInspectorContainer: View {
-    @StateObject private var model: CommentInspectorModel
-
-    init(document: MDDocument) {
-        _model = StateObject(wrappedValue: CommentInspectorModel(document: document))
-    }
+    @ObservedObject var model: CommentInspectorModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

@@ -220,6 +220,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate {
 /// the user fires Cmd-Shift-M or clicks a gutter dot.
 final class DocumentSplitViewController: NSViewController {
     private let document: MDDocument
+    private let commentInspectorModel: CommentInspectorModel
     private let statusBar = StatusBarController()
     private var splitVC: NSSplitViewController!
     private var inspectorItem: NSSplitViewItem?
@@ -227,6 +228,8 @@ final class DocumentSplitViewController: NSViewController {
 
     init(document: MDDocument) {
         self.document = document
+        // Subscribe before the collapsed SwiftUI inspector ever mounts.
+        commentInspectorModel = CommentInspectorModel(document: document)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -305,7 +308,7 @@ final class DocumentSplitViewController: NSViewController {
             mainItem.holdingPriority = .defaultLow + 1  // keep the doc, not the inspector
             splitVC.addSplitViewItem(mainItem)
 
-            let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
+            let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(model: commentInspectorModel))
             // Force-load the SwiftUI hosting view NOW (before the user can fire ⌘⇧M)
             // so the inspector model registers its NotificationCenter observers
             // immediately. Without this, the SwiftUI view is created lazily on first
@@ -337,7 +340,7 @@ final class DocumentSplitViewController: NSViewController {
             rightVC = NSHostingController(rootView: FormatPreviewView(document: document))
             collapsedByDefault = false  // preview is the point for csv/json/html
         } else {
-            rightVC = NSHostingController(rootView: CommentInspectorContainer(document: document))
+            rightVC = NSHostingController(rootView: CommentInspectorContainer(model: commentInspectorModel))
             collapsedByDefault = true   // inspector is on-demand for .md/.txt
         }
         // Same reason as the PDF branch: force-load the SwiftUI view NOW so the
