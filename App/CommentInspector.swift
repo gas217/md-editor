@@ -242,6 +242,8 @@ struct ComposerView: View {
             try CommentStore.addComment(comment, to: context.documentURL)
             NotificationCenter.default.post(name: .mdeditCommentsChanged, object: nil)
             onDismiss()
+            NotificationCenter.default.post(name: .mdeditCommentClicked, object: nil,
+                                            userInfo: ["id": comment.id, "documentURL": context.documentURL])
         } catch {
             NSLog("[mdedit.inspector] addComment failed: \(error)")
         }

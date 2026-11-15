@@ -109,13 +109,16 @@ final class Scenarios: XCTestCase {
         XCTAssertEqual(selectors.first(where: { $0["type"] as? String == "TextQuoteSelector" })?["exact"] as? String,
                        "Review this sentence with the agent.\n")
         XCTAssertNotNil(comment["id"] as? String)
-        let marker = app.buttons["Open comment: @claude clarify this #review"]
-        XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
-        marker.click()
         let body = app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS %@ OR value CONTAINS %@",
             "@claude clarify this #review", "@claude clarify this #review"
         )).firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout: 5), "Save should reveal the new thread")
+        app.buttons["Close"].click()
+        XCTAssertFalse(body.exists)
+        let marker = app.buttons["Open comment: @claude clarify this #review"]
+        XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
+        marker.click()
         XCTAssertTrue(body.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md")),
                        Data("Review this sentence with the agent.\n".utf8))
