@@ -204,8 +204,8 @@ final class Scenarios: XCTestCase {
 
         let state = app.waitForE2EState(
             timeout: 10,
-            until: { ($0.previewState["tableRows"] as? Int ?? 0) >= 1 },
-            message: "csv preview should render an HTML table with rows"
+            until: { ($0.previewState["tableRows"] as? Int ?? 0) >= 4 },
+            message: "csv preview should finish rendering the header and three rows"
         )
         // basic.csv has 1 header row + 3 data rows = 4 <tr> elements.
         XCTAssertGreaterThanOrEqual(state.previewState["tableRows"] as? Int ?? 0, 4,
@@ -242,8 +242,8 @@ final class Scenarios: XCTestCase {
 
         let state = app.waitForE2EState(
             timeout: 10,
-            until: { ($0.previewState["htmlBodyChildren"] as? Int ?? 0) >= 1 },
-            message: "html preview should render body children"
+            until: { ($0.previewState["htmlBodyChildren"] as? Int ?? 0) >= 3 },
+            message: "html preview should finish rendering the heading, paragraph, and list"
         )
         // basic.html has h1 + p + ul = 3 children
         XCTAssertGreaterThanOrEqual(state.previewState["htmlBodyChildren"] as? Int ?? 0, 3,
