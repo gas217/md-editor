@@ -90,9 +90,10 @@ final class Scenarios: XCTestCase {
         editor.typeKey("m", modifierFlags: [.command, .shift])
         let composer = app.textViews["composerBody"]
         XCTAssertTrue(composer.waitForExistence(timeout: 5), app.debugDescription)
-        composer.click()
-        composer.typeText("@claude clarify this #review")
-        composer.typeKey(.return, modifierFlags: .command)
+        // Type through the application: clicking the field would conceal a
+        // broken focus handoff that sends the user's comment into the document.
+        app.typeText("@claude clarify this #review")
+        app.typeKey(.return, modifierFlags: .command)
         _ = app.waitForE2EState(
             until: { ($0.editorState["commentMarkers"] as? Int ?? 0) == 1 },
             message: "saving should immediately show one real comment marker"
@@ -120,6 +121,16 @@ final class Scenarios: XCTestCase {
         XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
         marker.click()
         XCTAssertTrue(body.waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["Close"].click()
+        editor.click()
+        editor.typeKey("a", modifierFlags: .command)
+        editor.typeKey("m", modifierFlags: [.command, .shift])
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        app.typeText("Cancel this draft")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(composer.exists)
+        XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md.comments.json")), data,
+                       "Escape must not persist a second comment")
         XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md")),
                        Data("Review this sentence with the agent.\n".utf8))
     }

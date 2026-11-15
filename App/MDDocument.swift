@@ -277,7 +277,7 @@ final class DocumentSplitViewController: NSViewController {
                 forName: .mdeditCommentRequested, object: nil, queue: .main
             ) { [weak self] note in
                 guard let self, note.userInfo?["documentURL"] as? URL == self.document.fileURL else { return }
-                self.revealInspector()
+                self.revealInspector(focusComposer: true)
             }
         )
         observers.append(
@@ -347,11 +347,36 @@ final class DocumentSplitViewController: NSViewController {
         inspectorItem = rightItem
     }
 
-    private func revealInspector() {
-        guard let item = inspectorItem, item.isCollapsed else { return }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.allowsImplicitAnimation = true
-            item.animator().isCollapsed = false
+    private func revealInspector(focusComposer: Bool = false) {
+        guard let item = inspectorItem else { return }
+        let finish: () -> Void = { [weak self] in
+            if focusComposer { self?.focusComposerEditor() }
+        }
+        if item.isCollapsed {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.allowsImplicitAnimation = true
+                item.animator().isCollapsed = false
+            }, completionHandler: finish)
+        } else {
+            DispatchQueue.main.async(execute: finish)
+        }
+    }
+
+    private func focusComposerEditor() {
+        guard commentInspectorModel.composer != nil,
+              let inspectorView = inspectorItem?.viewController.view else { return }
+        inspectorView.layoutSubtreeIfNeeded()
+        // SwiftUI's onAppear can fire while the split item is still collapsed.
+        // Make the actual native TextEditor first responder after reveal/layout.
+        func editableTextView(in view: NSView) -> NSTextView? {
+            if let textView = view as? NSTextView, textView.isEditable { return textView }
+            for child in view.subviews {
+                if let found = editableTextView(in: child) { return found }
+            }
+            return nil
+        }
+        if let input = editableTextView(in: inspectorView) {
+            input.window?.makeFirstResponder(input)
         }
     }
 
