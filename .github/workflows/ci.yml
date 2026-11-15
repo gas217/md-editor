@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build and test
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +47,7 @@ jobs:
         continue-on-error: true
 
       - name: Run E2E suite
-        # 10 test methods with the assertion gaps listed in docs/e2e-test-plan.md.
+        # UI scenarios and remaining assertion gaps: docs/e2e-test-plan.md.
         # Actual failures remain blocking.
         # Requires a macOS runner with UI testing / Automation access.
         run: make e2e
@@ -64,7 +64,7 @@ jobs:
 
   score:
     name: Build-readiness score
-    runs-on: macos-14
+    runs-on: macos-15
     # Score depends on build so we never grant 100 for build_score without a real build.
     needs: build
     steps:
