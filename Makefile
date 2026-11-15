@@ -38,6 +38,12 @@ build: project editor-bundle
 	# "MDEditor.app/Contents/Helpers/mdedit" is actually true.
 	mkdir -p build/Build/Products/Debug/MDEditor.app/Contents/Helpers
 	cp -f build/Build/Products/Debug/mdedit build/Build/Products/Debug/MDEditor.app/Contents/Helpers/mdedit
+	# Seal the assembled local bundle after copying assets/helper. Ad-hoc builds
+	# cannot use team-based library validation for Sparkle; notarize.sh restores
+	# hardened runtime with a Developer ID signature for distribution.
+	codesign --force --sign - --options 0 --preserve-metadata=identifier,entitlements \
+	  build/Build/Products/Debug/MDEditor.app
+	codesign --verify --deep --strict build/Build/Products/Debug/MDEditor.app
 
 test: build
 	rm -rf build/unit-result.xcresult
@@ -104,6 +110,12 @@ build-release: project editor-bundle
 	          build/Build/Products/Release/MDEditor.app/Contents/Helpers
 	cp -f build/editor/editor.html build/editor/editor.js build/Build/Products/Release/MDEditor.app/Contents/Resources/
 	cp -f build/Build/Products/Release/mdedit build/Build/Products/Release/MDEditor.app/Contents/Helpers/mdedit
+	# Seal the assembled local bundle after copying assets/helper. Ad-hoc builds
+	# cannot use team-based library validation for Sparkle; notarize.sh restores
+	# hardened runtime with a Developer ID signature for distribution.
+	codesign --force --sign - --options 0 --preserve-metadata=identifier,entitlements \
+	  build/Build/Products/Release/MDEditor.app
+	codesign --verify --deep --strict build/Build/Products/Release/MDEditor.app
 
 release: build-release
 	@if [ -n "$${MDEDIT_APPLE_ID:-}" ]; then \

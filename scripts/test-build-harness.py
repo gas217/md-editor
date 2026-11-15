@@ -82,6 +82,12 @@ fi
         result = self.run_make("build", "missing-helper")
         self.assertNotEqual(result.returncode, 0, result.stdout)
 
+    def test_assembled_bundle_signing_failures_block_both_builds(self):
+        for target in ("build", "build-release"):
+            with self.subTest(target=target):
+                result = self.run_make(target, "signing")
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
     def test_release_without_credentials_checks_packaging(self):
         scripts = self.root / "scripts"
         scripts.mkdir()

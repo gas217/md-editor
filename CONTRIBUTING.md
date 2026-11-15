@@ -74,3 +74,9 @@ If you add a new scenario: extend the probe in `App/E2EBridge.swift` if the sign
 ## License
 
 By contributing, you agree your contribution is MIT-licensed under the same terms as the rest of the repo.
+
+Local Debug and Release bundles are ad-hoc signed after editor assets and the
+CLI are installed; signature verification is part of the build. These local
+bundles omit hardened-runtime library validation because ad-hoc identities have
+no shared Team ID. `scripts/notarize.sh` applies Developer ID signing and hardened
+runtime for public distribution; a local build is not a notarized release.
