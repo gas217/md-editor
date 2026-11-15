@@ -224,7 +224,6 @@ struct ComposerView: View {
             }
         }
         .padding(14)
-        .accessibilityIdentifier("composerPane")
         .onAppear { focused = true }
     }
 
@@ -265,6 +264,8 @@ struct ThreadView: View {
                 Text(comment.body)
                     .font(.body)
                     .textSelection(.enabled)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(comment.body)
                     .accessibilityIdentifier("threadBody")
                 ForEach(comment.thread.indices, id: \.self) { idx in
                     let reply = comment.thread[idx]
@@ -281,7 +282,6 @@ struct ThreadView: View {
             }
             .padding(14)
         }
-        .accessibilityIdentifier("commentThread")
     }
 }
 

@@ -195,9 +195,9 @@ const commentTheme = EditorView.baseTheme({
     },
     ".cm-comment-marker:hover": { backgroundColor: "rgba(127,127,127,0.18)" },
     ".cm-comment-marker:focus-visible": { outline: "2px solid currentColor", outlineOffset: "-2px" },
-    ".cm-comment-active": { color: "#f9a825" },
-    ".cm-comment-orphaned": { color: "#e57373" },
-    ".cm-comment-resolved": { color: "#66bb6a" },
+    ".cm-comment-marker.cm-comment-active": { color: "#f9a825" },
+    ".cm-comment-marker.cm-comment-orphaned": { color: "#e57373" },
+    ".cm-comment-marker.cm-comment-resolved": { color: "#66bb6a" },
     // Hybrid live preview: hide markdown syntax markers on non-active lines.
     ".cm-hidden-marker": { display: "none" },
     // Heading line decorations. Sizes mirror preview-md-shared's HTMLTemplate.swift
@@ -570,6 +570,11 @@ function doDocLoad(payload: { text: string; language: string; readOnly: boolean 
     });
     if (view) view.destroy();
     view = new EditorView({ state, parent: document.body });
+    // CodeMirror hides all gutters from AX by default. Our gutter contains real
+    // controls; expose those while keeping decorative folding gutters hidden.
+    view.dom.querySelector(".cm-gutters")?.removeAttribute("aria-hidden");
+    view.dom.querySelectorAll(".cm-gutter:not(.cm-comments-gutter)")
+        .forEach(g => g.setAttribute("aria-hidden", "true"));
     emitStatus(state);
     send("editor.ready", {}, 0);
 }
