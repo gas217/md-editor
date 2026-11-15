@@ -54,6 +54,7 @@ let view: EditorView | null = null;
 // Comment state — driven by Swift sending `comments.set` whenever the sidecar changes.
 interface CommentMarker {
     id: string;
+    label: string;
     from: number;
     to: number;
     status: "active" | "orphaned" | "resolved" | "archived";
@@ -88,9 +89,10 @@ class CommentGutterMarker extends GutterMarker {
             button.type = "button";
             button.className = `cm-comment-marker cm-comment-${comment.status}`;
             button.dataset.commentId = comment.id;
-            const status = comment.status === "resolved" ? "resolved" : "open";
-            button.setAttribute("aria-label", `Open ${status} comment ${comment.id}`);
-            button.title = `Open ${status} comment`;
+            const action = comment.status === "resolved" ? "Open resolved comment" : "Open comment";
+            const label = `${action}: ${comment.label}`;
+            button.setAttribute("aria-label", label);
+            button.title = label;
             button.textContent = comment.status === "resolved" ? "✓" : comment.status === "orphaned" ? "○" : "●";
             button.addEventListener("click", event => {
                 event.preventDefault();

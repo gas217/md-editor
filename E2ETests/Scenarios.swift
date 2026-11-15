@@ -108,13 +108,13 @@ final class Scenarios: XCTestCase {
         let selectors = try XCTUnwrap(target["selectors"] as? [[String: Any]])
         XCTAssertEqual(selectors.first(where: { $0["type"] as? String == "TextQuoteSelector" })?["exact"] as? String,
                        "Review this sentence with the agent.\n")
-        let id = try XCTUnwrap(comment["id"] as? String)
-        let marker = app.buttons["Open open comment \(id)"]
+        XCTAssertNotNil(comment["id"] as? String)
+        let marker = app.buttons["Open comment: @claude clarify this #review"]
         XCTAssertTrue(marker.waitForExistence(timeout: 5), app.debugDescription)
         marker.click()
-        let body = app.staticTexts["threadBody"]
+        let body = app.descendants(matching: .any)["threadBody"]
         XCTAssertTrue(body.waitForExistence(timeout: 5))
-        XCTAssertEqual(body.value as? String, "@claude clarify this #review")
+        XCTAssertEqual(body.label, "@claude clarify this #review")
         XCTAssertEqual(try Data(contentsOf: tmp.appendingPathComponent("comment-review.md")),
                        Data("Review this sentence with the agent.\n".utf8))
     }
@@ -172,12 +172,12 @@ final class Scenarios: XCTestCase {
             until: { ($0.editorState["commentMarkers"] as? Int ?? 0) == 1 },
             message: "second launch restored the saved marker"
         )
-        let marker = app2.buttons["Open open comment c_seeded000000000000000001"]
+        let marker = app2.buttons["Open comment: Seeded comment for reopen test."]
         XCTAssertTrue(marker.waitForExistence(timeout: 5))
         marker.click()
-        let body = app2.staticTexts["threadBody"]
+        let body = app2.descendants(matching: .any)["threadBody"]
         XCTAssertTrue(body.waitForExistence(timeout: 5))
-        XCTAssertEqual(body.value as? String, "Seeded comment for reopen test.")
+        XCTAssertEqual(body.label, "Seeded comment for reopen test.")
         XCTAssertEqual(try String(contentsOf: sidecarPath, encoding: .utf8), sidecar,
                        "viewing a thread must not rewrite its sidecar")
     }

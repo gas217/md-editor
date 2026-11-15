@@ -26,6 +26,7 @@ enum CommentPresentation {
                   let actual = TextCanon.substring(text, from: start, to: end),
                   actual == quote.exact else { return nil }
             return ["id": comment.id, "from": start, "to": end,
+                    "label": String(comment.body.prefix(80)).replacingOccurrences(of: "\n", with: " "),
                     "status": comment.resolved ? "resolved" : comment.status.rawValue]
         }
     }

@@ -266,6 +266,7 @@ struct ThreadView: View {
                     .textSelection(.enabled)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(comment.body)
+                    .accessibilityAddTraits(.isStaticText)
                     .accessibilityIdentifier("threadBody")
                 ForEach(comment.thread.indices, id: \.self) { idx in
                     let reply = comment.thread[idx]

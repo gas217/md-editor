@@ -66,7 +66,7 @@ e2e: build
 	  -configuration Debug -derivedDataPath build \
 	  -only-testing:MDEditorE2ETests \
 	  -resultBundlePath build/e2e-result.xcresult \
-	  2>&1 | tail -40
+	  2>&1 | tee build/e2e.log | tail -40
 	@echo "Result bundle: build/e2e-result.xcresult"
 	@if [ -d build/e2e-result.xcresult ]; then \
 	  echo "--- summary ---"; \

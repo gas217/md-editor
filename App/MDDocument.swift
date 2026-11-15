@@ -309,12 +309,6 @@ final class DocumentSplitViewController: NSViewController {
             splitVC.addSplitViewItem(mainItem)
 
             let inspectorVC = NSHostingController(rootView: CommentInspectorContainer(model: commentInspectorModel))
-            // Force-load the SwiftUI hosting view NOW (before the user can fire ⌘⇧M)
-            // so the inspector model registers its NotificationCenter observers
-            // immediately. Without this, the SwiftUI view is created lazily on first
-            // reveal and the comment-requested notification arrives before any
-            // subscriber is listening — the bug Ag hit on the karpathy file.
-            _ = inspectorVC.view
             let item = NSSplitViewItem(viewController: inspectorVC)
             item.canCollapse = true
             item.isCollapsed = true            // hidden by default
@@ -343,11 +337,6 @@ final class DocumentSplitViewController: NSViewController {
             rightVC = NSHostingController(rootView: CommentInspectorContainer(model: commentInspectorModel))
             collapsedByDefault = true   // inspector is on-demand for .md/.txt
         }
-        // Same reason as the PDF branch: force-load the SwiftUI view NOW so the
-        // inspector's NotificationCenter observers register before the user can
-        // fire ⌘⇧M. Without this the comment-requested notification arrives
-        // before any subscriber is listening and the composer never appears.
-        _ = rightVC.view
         let rightItem = NSSplitViewItem(viewController: rightVC)
         rightItem.canCollapse = true
         rightItem.isCollapsed = collapsedByDefault
