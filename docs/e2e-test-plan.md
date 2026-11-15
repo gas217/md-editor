@@ -15,7 +15,8 @@ evidence that its full planned behavior is asserted.
 CI runs the full suite, then repeats comment creation/navigation and persisted
 thread reopening three times. Every iteration must pass; this is not retry-until-green.
 Result bundles and the complete UI log are uploaded for seven days on both
-success and failure. CI uses `macos-15`; the retired `macos-14` runner cannot start jobs.
+success and failure. UI steps have a ten-minute timeout, and superseded PR runs
+are cancelled. Both build configurations verify their assembled bundle signature. CI uses `macos-15`; the retired `macos-14` runner cannot start jobs.
 
 The November 15 local unit run passed 84 tests with 18 existing acceptance
 placeholders skipped. The local UI runner timed out enabling macOS automation
@@ -35,7 +36,7 @@ is historical and does not describe the expanded suite.
 | 3 | Gutter has no white strip | `testGutterHasNoWhiteStrip` checks the computed background is transparent. |
 | 4 | Comment command without selection does not open composer | `testCommentWithoutSelectionDoesNothing` clicks the toolbar without selection and checks composer and sidecar absence. |
 | 5 | Select text + comment command opens composer with quote | `testCreateCommentAndOpenThread` selects the fixture through the real editor and invokes Cmd-Shift-M. It checks the composer, then the exact saved quote. The toolbar selection path and visible quote are also checked manually. |
-| 6 | Enter comment + save writes a valid sidecar | The creation test types into the composer, saves with Cmd-Return, checks one comment, exact body/quote, agent addressability, immediate marker and thread, and unchanged document bytes. |
+| 6 | Enter comment + save writes a valid sidecar | The creation test types immediately through the app without clicking the composer, saves with Cmd-Return, checks one comment, exact body/quote, agent addressability, immediate marker and thread, and unchanged document bytes. |
 | 7 | Quit/reopen restores a comment's gutter dot | `testReopenShowsGutterDot` loads a valid seeded sidecar, reopens, checks a real DOM marker and accessible button, clicks to read the saved body, and verifies the sidecar bytes were not rewritten. |
 | 8 | Click gutter dot reveals the matching thread | Both comment tests click the real accessible marker and require the matching visible thread text. The creation test closes the automatically shown thread before clicking, preventing a false pass from an already-open thread. |
 | 9 | CSV opens with table preview | `testOpensCsvPreview` checks at least four HTML table rows and two web views. The preview uses WKWebView, not NSTableView. |
@@ -66,7 +67,8 @@ A build-for-testing pass verifies compilation only; inspect the test
 execution result before reporting the suite as passing. CI retains result
 bundles and `build/e2e.log` on success and failure.
 
-Remaining comment coverage includes Escape cancellation, multi-document UI
+The creation test also cancels a typed draft with Escape and verifies unchanged
+sidecar and document bytes. Remaining comment coverage includes multi-document UI
 isolation, keyboard activation of marker buttons, long/Unicode selections,
 and external refresh (13). A file watcher is not implemented: reopen to see
 an agent's external sidecar edit. Native Accessibility exposes composer controls
